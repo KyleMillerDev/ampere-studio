@@ -1,0 +1,361 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Ampere Creative Group — Backend Infrastructure
+  Lambda functions, API Gateway, DynamoDB tables, S3 buckets, and SES
+  configuration for form submissions, wedding client portal, and brand
+  kit generator.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 15
+    MemorySize: 256
+    Environment:
+      Variables:
+        AWS_REGION: !Ref AWS::Region
+    Layers:
+      - !Ref SharedLayer
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment
+
+  SenderEmail:
+    Type: String
+    Description: SES verified sender email address
+    Default: noreply@amperecreativegroup.com
+
+  RecipientEmail:
+    Type: String
+    Description: Email address to receive form submission notifications
+    Default: hello@amperecreativegroup.com
+
+  AllowedOrigin:
+    Type: String
+    Description: Allowed CORS origin
+    Default: https://amperecreativegroup.com
+
+Resources:
+
+  # ─── Shared Lambda Layer ────────────────────────────────────────────
+  SharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub ampere-cg-shared-${Environment}
+      Description: Shared utilities for Ampere CG Lambda functions
+      ContentUri: lambda/shared/
+      CompatibleRuntimes:
+        - python3.12
+      RetentionPolicy: Delete
+
+  # ─── DynamoDB Tables ────────────────────────────────────────────────  FormSubmissionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AmpereCG-Form-Submissions
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: submissionId
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+        - AttributeName: formId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: submissionId
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: formId-timestamp-index
+          KeySchema:
+            - AttributeName: formId
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: AmpereCG
+        - Key: Environment
+          Value: !Ref Environment
+
+  WeddingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AmpereCG-Weddings
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: weddingKey
+          AttributeType: S
+      KeySchema:
+        - AttributeName: weddingKey
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: AmpereCG
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ─── IAM Roles ──────────────────────────────────────────────────────
+  FormSubmissionLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ampere-cg-form-submission-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: FormSubmissionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt FormSubmissionsTable.Arn
+                  - !Sub "${FormSubmissionsTable.Arn}/index/*"
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: "*"
+
+  WeddingsLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ampere-cg-weddings-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: WeddingsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource: !GetAtt WeddingsTable.Arn
+
+  BrandKitLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ampere-cg-brand-kit-role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BrandKitPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: "arn:aws:s3:::ampere-public/brand-kits/*"
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: "*"
+
+  # ─── Lambda Functions ───────────────────────────────────────────────
+  FormSubmissionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ampere-cg-form-submission-${Environment}
+      CodeUri: lambda/form_submission/
+      Handler: handler.handler
+      Role: !GetAtt FormSubmissionLambdaRole.Arn
+      Description: Handles form submissions, saves to DynamoDB, and sends SES notifications
+      Environment:
+        Variables:
+          FORM_SUBMISSIONS_TABLE: !Ref FormSubmissionsTable
+          SENDER_EMAIL: !Ref SenderEmail
+          RECIPIENT_EMAIL: !Ref RecipientEmail
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+      Events:
+        SubmitPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AmpereCGApi
+            Path: /submit
+            Method: POST
+        SubmitOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AmpereCGApi
+            Path: /submit
+            Method: OPTIONS
+
+  WeddingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ampere-cg-weddings-${Environment}
+      CodeUri: lambda/weddings/
+      Handler: handler.handler
+      Role: !GetAtt WeddingsLambdaRole.Arn
+      Description: Serves wedding client portal data
+      Environment:
+        Variables:
+          WEDDINGS_TABLE: !Ref WeddingsTable
+      Events:
+        GetWedding:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AmpereCGApi
+            Path: /weddings/{key}
+            Method: GET
+        VerifyPin:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AmpereCGApi
+            Path: /weddings/{key}
+            Method: POST
+        WeddingsOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AmpereCGApi
+            Path: /weddings/{key}
+            Method: OPTIONS
+
+  # ─── API Gateway ────────────────────────────────────────────────────
+
+  BrandKitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ampere-cg-brand-kit-${Environment}
+      CodeUri: lambda/brand_kit/
+      Handler: handler.handler
+      Role: !GetAtt BrandKitLambdaRole.Arn
+      Description: Packages brand overlay PNGs into a zip, uploads to S3, and emails a download link
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          BRAND_KIT_BUCKET: "ampere-public"
+          SENDER_EMAIL: !Ref SenderEmail
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+      Events:
+        BrandKitPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AmpereCGApi
+            Path: /brand-kit
+            Method: POST
+        BrandKitOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AmpereCGApi
+            Path: /brand-kit
+            Method: OPTIONS
+
+  AmpereCGApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub ampere-cg-api-${Environment}
+      StageName: !Ref Environment
+      Cors:
+        AllowOrigin: !Sub "'${AllowedOrigin}'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowMethods: "'GET,POST,OPTIONS'"
+      GatewayResponses:
+        DEFAULT_4XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: !Sub "'${AllowedOrigin}'"
+        DEFAULT_5XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: !Sub "'${AllowedOrigin}'"
+
+  # ─── CloudWatch Log Groups ───────────────────────────────────────────
+  FormSubmissionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/ampere-cg-form-submission-${Environment}
+      RetentionInDays: 30
+
+  WeddingsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/ampere-cg-weddings-${Environment}
+      RetentionInDays: 30
+
+  BrandKitLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/ampere-cg-brand-kit-${Environment}
+      RetentionInDays: 30
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${AmpereCGApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+    Export:
+      Name: !Sub AmpereCG-ApiUrl-${Environment}
+
+  FormSubmissionsTableName:
+    Description: DynamoDB table name for form submissions
+    Value: !Ref FormSubmissionsTable
+    Export:
+      Name: !Sub AmpereCG-FormSubmissionsTable-${Environment}
+
+  WeddingsTableName:
+    Description: DynamoDB table name for weddings
+    Value: !Ref WeddingsTable
+    Export:
+      Name: !Sub AmpereCG-WeddingsTable-${Environment}
+
+  FormSubmissionFunctionArn:
+    Description: Form Submission Lambda ARN
+    Value: !GetAtt FormSubmissionFunction.Arn
+
+  WeddingsFunctionArn:
+    Description: Weddings Lambda ARN
+    Value: !GetAtt WeddingsFunction.Arn
+
+  BrandKitFunctionArn:
+    Description: Brand Kit Lambda ARN
+    Value: !GetAtt BrandKitFunction.Arn

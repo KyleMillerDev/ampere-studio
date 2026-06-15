@@ -1,0 +1,178 @@
+[
+  {
+    "weddingKey": "vandelune-2025",
+    "groomFirstName": "Christian",
+    "brideFirstName": "Bailey",
+    "lastName": "Vandelune",
+    "eventDate": "2025-06-21",
+    "coverPhoto": "https://static.wixstatic.com/media/2f7ef9_c99aa7f504464c26b189ab6f4b111f1a~mv2.jpg",
+    "coverVideo": "",
+    "message": "",
+    "pinHash": "",
+    "videos": [
+      {
+        "id": "vandelune-25-ceremony",
+        "title": "Ceremony",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Christian+%26+Bailey/Ceremony.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Christian+%26+Bailey/HD/Ceremony.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_859de85468fb4daa8b9a4cdec81d9158~mv2.jpg"
+      },
+      {
+        "id": "vandelune-25-speeches",
+        "title": "Cake & Speeches",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Christian+%26+Bailey/Speeches.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Christian+%26+Bailey/HD/Speeches.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_341d4010c14f4df09b30c08f92322eea~mv2.jpg"
+      },
+      {
+        "id": "vandelune-25-first-dances",
+        "title": "First Dances",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Christian+%26+Bailey/First+Dances.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Christian+%26+Bailey/HD/First+Dances.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_9f582ffbdff840b7bc88f52b622bdab5~mv2.jpg"
+      },
+      {
+        "id": "vandelune-25-highlight",
+        "title": "Cinematic Highlight Reel",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Christian+%26+Bailey/Highlight.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Christian+%26+Bailey/HD/Highlight.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_39571a54fe2945a09742daef0a5206c4~mv2.png"
+      }
+    ],
+    "files": [],
+    "expiresAt": "2028-01-01T00:00:00Z",
+    "ttl": 1830297600
+  },
+  {
+    "weddingKey": "britt-2025",
+    "groomFirstName": "Brandon",
+    "brideFirstName": "Emmaline",
+    "lastName": "Britt",
+    "eventDate": "2025-05-24",
+    "coverPhoto": "https://static.wixstatic.com/media/2f7ef9_5d6667cb737c497f9517fc3aec4b798d~mv2.jpg",
+    "coverVideo": "https://video.wixstatic.com/video/2f7ef9_3cd0e7a0fd844f43bf8066a8577ec068/file/Highlights%20COVER.mp4",
+    "message": "",
+    "pinHash": "",
+    "videos": [
+      {
+        "id": "britt-25-ceremony",
+        "title": "Wedding Ceremony",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Emmaline+%26+Brandon/Ceremony.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Emmaline+%26+Brandon/streaming/HD/Ceremony.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_1c7da1c1f4ae43b9a638b77cb5898aed~mv2.jpg"
+      },
+      {
+        "id": "britt-25-highlight",
+        "title": "Cinematic Highlight Reel",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Emmaline+%26+Brandon/Highlights.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Emmaline+%26+Brandon/streaming/HD/Highlights.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_5d6667cb737c497f9517fc3aec4b798d~mv2.jpg"
+      },
+      {
+        "id": "britt-25-first-dance",
+        "title": "First Dance",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Emmaline+%26+Brandon/First+Dance.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Emmaline+%26+Brandon/streaming/HD/First+Dance.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_f0332da48e9f4fb68f19288b2d696bb2~mv2.jpg"
+      },
+      {
+        "id": "britt-25-speeches",
+        "title": "Reception Speeches",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Emmaline+%26+Brandon/Speeches.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Emmaline+%26+Brandon/streaming/HD/Speeches.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_733eda448b614ddc86de2ee8892229c1~mv2.jpg"
+      },
+      {
+        "id": "britt-25-vows",
+        "title": "Wedding Vows",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Emmaline+%26+Brandon/Vows.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Emmaline+%26+Brandon/streaming/HD/Vows.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_a5b6d96840584f1abc2d590e4593b598~mv2.jpg"
+      }
+    ],
+    "files": [],
+    "expiresAt": "2028-01-01T00:00:00Z",
+    "ttl": 1830297600
+  },
+  {
+    "weddingKey": "hoadley-2025",
+    "groomFirstName": "Noah",
+    "brideFirstName": "Shannon",
+    "lastName": "Hoadley",
+    "eventDate": "2025-06-22",
+    "coverPhoto": "https://static.wixstatic.com/media/2f7ef9_dfb13329bf374632842536e1c643d36a~mv2.png",
+    "coverVideo": "",
+    "message": "",
+    "pinHash": "",
+    "videos": [
+      {
+        "id": "hoadley-25-ceremony",
+        "title": "Ceremony",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Noah+%26+Shannon/Ceremony.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Noah+%26+Shannon/stream/HD/Ceremony.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_dfb13329bf374632842536e1c643d36a~mv2.png"
+      },
+      {
+        "id": "hoadley-25-speeches",
+        "title": "Speeches",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Noah+%26+Shannon/Speeches.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Noah+%26+Shannon/stream/HD/Speeches.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_c27efe5443ca4c8787b28d7ed0d2598c~mv2.png"
+      },
+      {
+        "id": "hoadley-25-first-dances",
+        "title": "First Dances",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Noah+%26+Shannon/First+Dances.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Noah+%26+Shannon/stream/HD/First+Dances.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_9b6fd3fc88884033bb05ac916da3c5ce~mv2.png"
+      },
+      {
+        "id": "hoadley-25-vows",
+        "title": "Vows",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Noah+%26+Shannon/Vows.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Noah+%26+Shannon/stream/HD/Vows.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_f47c0c415e79400c8b0d4cabe41749c5~mv2.png"
+      },
+      {
+        "id": "hoadley-25-highlight",
+        "title": "Cinematic Highlight Reel",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Noah+%26+Shannon/Highlight.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Noah+%26+Shannon/stream/HD/Highlight.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_83cf76e358d9416080c1038f271ff913~mv2.png"
+      }
+    ],
+    "files": [],
+    "expiresAt": "2028-01-01T00:00:00Z",
+    "ttl": 1830297600
+  },
+  {
+    "weddingKey": "downey-2025",
+    "groomFirstName": "Josh",
+    "brideFirstName": "Rachael",
+    "lastName": "Downey",
+    "eventDate": "2025-05-30",
+    "coverPhoto": "https://static.wixstatic.com/media/2f7ef9_ea7b9fda9c7243699402e76ca8007f81~mv2.png",
+    "coverVideo": "",
+    "message": "",
+    "pinHash": "",
+    "videos": [
+      {
+        "id": "downey-25-ceremony",
+        "title": "Wedding Ceremony",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Rachael+%26+Josh/Ceremony.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Rachael+%26+Josh/streaming/HD/Ceremony.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_aaf30ab9166a485696a9551bdccd0963~mv2.png"
+      },
+      {
+        "id": "downey-25-highlight",
+        "title": "Cinematic Highlights",
+        "fullQualityUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Rachael+%26+Josh/Highlight.mp4",
+        "hdStreamingUrl": "https://ampere-wedding-videos.s3.us-east-2.amazonaws.com/Rachael+%26+Josh/streaming/HD/Highlight.mp4",
+        "thumbnail": "https://static.wixstatic.com/media/2f7ef9_c7c04394ba1149d1904d956575ac89b2~mv2.png"
+      }
+    ],
+    "files": [],
+    "expiresAt": "2028-01-01T00:00:00Z",
+    "ttl": 1830297600
+  }
+]
