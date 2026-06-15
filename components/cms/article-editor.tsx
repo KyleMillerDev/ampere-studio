@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
@@ -12,6 +12,7 @@ import {
   Image01Icon,
   CheckmarkCircle01Icon,
   SparklesIcon,
+  Upload01Icon,
 } from "@hugeicons/core-free-icons"
 
 import { Button } from "@/components/ui/button"
@@ -54,6 +55,11 @@ import {
   type ArticleWithBody,
 } from "@/lib/validation/article.schema"
 import { isAiArticlePaymentBypassed } from "@/lib/cms/ai-billing"
+import {
+  insertTextAtCursor,
+  markdownImageSnippet,
+  uploadStudioImage,
+} from "@/lib/cms/upload-studio-image"
 
 const devPaymentBypass = isAiArticlePaymentBypassed()
 
@@ -83,6 +89,9 @@ export function ArticleEditor({ initial }: ArticleEditorProps) {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [writeConfirmOpen, setWriteConfirmOpen] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!slugTouched && title) {
@@ -205,6 +214,28 @@ export function ArticleEditor({ initial }: ArticleEditorProps) {
     }
   }
 
+  async function handleImageUpload(file: File) {
+    setUploadingImage(true)
+    try {
+      const image = await uploadStudioImage(file, title.trim() || file.name)
+      const snippet = markdownImageSnippet(
+        image.s3Url,
+        image.alt || title.trim() || "Image"
+      )
+      if (bodyRef.current) {
+        setBody(insertTextAtCursor(bodyRef.current, body, snippet))
+      } else {
+        setBody((prev) => prev + snippet)
+      }
+      toast.success("Image uploaded and added to the article")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Image upload failed")
+    } finally {
+      setUploadingImage(false)
+      if (imageInputRef.current) imageInputRef.current.value = ""
+    }
+  }
+
   async function handleSave() {
     if (!title.trim()) {
       toast.error("Title is required")
@@ -257,7 +288,13 @@ export function ArticleEditor({ initial }: ArticleEditorProps) {
 
       if (!isEdit && data.article) {
         router.push(`/articles/${data.article.id}`)
+        if (data.article.excerpt && !excerpt.trim()) {
+          setExcerpt(data.article.excerpt)
+        }
       } else {
+        if (data.article?.excerpt && !excerpt.trim()) {
+          setExcerpt(data.article.excerpt)
+        }
         router.refresh()
       }
     } catch (err) {
@@ -354,7 +391,7 @@ export function ArticleEditor({ initial }: ArticleEditorProps) {
               id="article-excerpt"
               value={excerpt}
               onChange={(e) => setExcerpt(e.target.value)}
-              placeholder="Short summary shown in article listings."
+              placeholder="Short summary for listings. Leave blank to auto-generate when you publish."
               rows={2}
             />
           </div>
@@ -419,19 +456,42 @@ export function ArticleEditor({ initial }: ArticleEditorProps) {
                 Write your article content here.
               </CardDescription>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setWriteConfirmOpen(true)}
-              disabled={generating}
-            >
-              <HugeiconsIcon icon={SparklesIcon} className="mr-1 size-4" />
-              {generating ? "Writing..." : "Write for me ($4.99)"}
-            </Button>
+            <div className="flex shrink-0 gap-2">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void handleImageUpload(file)
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={uploadingImage}
+                onClick={() => imageInputRef.current?.click()}
+              >
+                <HugeiconsIcon icon={Upload01Icon} className="mr-1 size-4" />
+                {uploadingImage ? "Uploading..." : "Upload image"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setWriteConfirmOpen(true)}
+                disabled={generating}
+              >
+                <HugeiconsIcon icon={SparklesIcon} className="mr-1 size-4" />
+                {generating ? "Writing..." : "Write for me ($4.99)"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="flex-1">
             <Textarea
+              ref={bodyRef}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="# Your article title&#10;&#10;Start writing..."

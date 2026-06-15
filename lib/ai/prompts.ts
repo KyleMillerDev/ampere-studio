@@ -73,3 +73,22 @@ Title: ${params.title}
 
 The article should help ${params.company} rank for relevant local and industry keywords while providing genuine value to readers.`
 }
+
+export function excerptGenerationPrompt(params: {
+  title: string
+  bodyText: string
+}): string {
+  return `Write a short excerpt (1-2 sentences, max 200 characters) for this blog article listing page.
+
+Title: ${params.title}
+
+Article content:
+${params.bodyText}
+
+Rules:
+- Plain text only, no markdown
+- Compelling summary that encourages clicks
+- NEVER use em-dashes (— or --)
+- NEVER use these words: ${BANNED_WORDS.join(", ")}
+- Return only the excerpt text, nothing else`
+}

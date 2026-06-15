@@ -8,6 +8,7 @@ import {
 import { v4 as uuidv4 } from "uuid"
 
 import { deletePublicObject, getObjectText, putObjectText } from "@/lib/aws/s3"
+import { generateArticleExcerpt } from "@/lib/ai/openrouter"
 import { getDynamo } from "@/lib/aws/dynamo"
 import { CONTENT_TABLE, SK_PREFIX } from "@/lib/cms/constants"
 import { getActiveClientId } from "@/lib/cms/client-context"
@@ -37,6 +38,24 @@ function newArticleId(): string {
 
 export function buildArticleS3Key(clientId: string, slug: string): string {
   return `${clientId}/articles/${slug}.mdx`
+}
+
+async function resolveExcerptForPublish(params: {
+  title: string
+  excerpt: string | undefined
+  body: string
+  publishing: boolean
+}): Promise<string> {
+  const trimmed = params.excerpt?.trim() ?? ""
+  if (!params.publishing || trimmed) return trimmed
+  try {
+    return await generateArticleExcerpt({
+      title: params.title,
+      body: params.body,
+    })
+  } catch {
+    return params.title.trim().slice(0, 200)
+  }
 }
 
 function toArticle(item: Record<string, unknown>): Article {
@@ -110,8 +129,16 @@ export async function createArticle(
     aiGenerated && input.status === "published" && !input.paidAt
   const status =
     paymentRequired && !isAiArticlePaymentBypassed() ? "draft" : input.status
-  const publishedAt =
-    status === "published" ? (input.publishedAt ?? now) : input.publishedAt
+  const isPublishing = status === "published"
+  const excerpt = await resolveExcerptForPublish({
+    title: input.title,
+    excerpt: input.excerpt,
+    body: input.body,
+    publishing: isPublishing,
+  })
+  const publishedAt = isPublishing
+    ? (input.publishedAt ?? now)
+    : input.publishedAt
 
   await putObjectText({ key: s3Key, body: input.body })
 
@@ -123,7 +150,7 @@ export async function createArticle(
     slug: input.slug,
     status,
     thumbnailUrl,
-    excerpt: input.excerpt,
+    excerpt,
     publishedAt,
     aiGenerated,
     paidAt: input.paidAt,
@@ -169,6 +196,27 @@ export async function updateArticle(
     !isAiArticlePaymentBypassed()
 
   const effectiveStatus = paymentBlocked ? "draft" : input.status
+  const isPublishSave =
+    input.status === "published" && effectiveStatus === "published"
+
+  const bodyForExcerpt =
+    input.body !== undefined
+      ? input.body
+      : await getObjectText(existing.s3Key).catch(() => existing.body)
+
+  const excerptSource =
+    input.excerpt !== undefined ? input.excerpt : existing.excerpt
+  let excerptToSave: string | undefined
+  if (isPublishSave && !excerptSource?.trim()) {
+    excerptToSave = await resolveExcerptForPublish({
+      title: input.title ?? existing.title,
+      excerpt: excerptSource,
+      body: bodyForExcerpt,
+      publishing: true,
+    })
+  } else if (input.excerpt !== undefined) {
+    excerptToSave = input.excerpt
+  }
 
   if (input.slug && input.slug !== existing.slug) {
     const newKey = buildArticleS3Key(clientId, input.slug)
@@ -210,7 +258,9 @@ export async function updateArticle(
     const value =
       rawKey === "status" && effectiveStatus !== undefined
         ? effectiveStatus
-        : input[rawKey]
+        : rawKey === "excerpt" && excerptToSave !== undefined
+          ? excerptToSave
+          : input[rawKey]
     if (value === undefined) continue
     const attr = `#${rawKey}`
     const placeholder = `:${rawKey}`
@@ -271,18 +321,36 @@ export async function markArticlePaidAndPublish(
   const existing = await getArticle(id)
   if (!existing) return null
 
+  const articleBody = await getObjectText(existing.s3Key).catch(
+    () => existing.body
+  )
+  let excerpt = existing.excerpt?.trim() ?? ""
+  if (!excerpt) {
+    excerpt = await resolveExcerptForPublish({
+      title: existing.title,
+      excerpt: existing.excerpt,
+      body: articleBody,
+      publishing: true,
+    })
+  }
+
   const now = new Date().toISOString()
   const setParts = [
     "updatedAt = :updatedAt",
     "paidAt = :paidAt",
     "#status = :published",
+    "#excerpt = :excerpt",
   ]
   const values: Record<string, unknown> = {
     ":updatedAt": now,
     ":paidAt": now,
     ":published": "published" as Article["status"],
+    ":excerpt": excerpt,
   }
-  const names: Record<string, string> = { "#status": "status" }
+  const names: Record<string, string> = {
+    "#status": "status",
+    "#excerpt": "excerpt",
+  }
 
   if (!existing.publishedAt) {
     names["#publishedAt"] = "publishedAt"
@@ -311,7 +379,7 @@ export async function markArticlePaidAndPublish(
   if (!res.Attributes) return null
 
   const updated = toArticle(res.Attributes)
-  const body = await getObjectText(updated.s3Key).catch(() => existing.body)
+  const body = await getObjectText(updated.s3Key).catch(() => articleBody)
   return { ...updated, body }
 }
 

@@ -57,10 +57,11 @@ function loadEnvFile() {
 loadEnvFile()
 
 const credentials =
-  process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+  process.env.AMPERE_AWS_ACCESS_KEY_ID &&
+  process.env.AMPERE_AWS_SECRET_ACCESS_KEY
     ? {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        accessKeyId: process.env.AMPERE_AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AMPERE_AWS_SECRET_ACCESS_KEY,
         sessionToken: process.env.AWS_SESSION_TOKEN,
       }
     : undefined

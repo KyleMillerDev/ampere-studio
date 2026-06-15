@@ -3,15 +3,33 @@ import { OpenRouter } from "@openrouter/sdk"
 import {
   ARTICLE_STYLE_INSTRUCTIONS,
   articleGenerationPrompt,
+  excerptGenerationPrompt,
   titleSuggestionsPrompt,
 } from "@/lib/ai/prompts"
 
 const DEFAULT_MODEL = "~anthropic/claude-sonnet-latest"
+const DEFAULT_EXCERPT_MODEL = "openai/gpt-4o-mini"
 
 let client: OpenRouter | null = null
 
 export function getArticleModel(): string {
   return process.env.OPENROUTER_ARTICLE_MODEL?.trim() || DEFAULT_MODEL
+}
+
+export function getExcerptModel(): string {
+  return process.env.OPENROUTER_EXCERPT_MODEL?.trim() || DEFAULT_EXCERPT_MODEL
+}
+
+function stripMarkdownForExcerpt(markdown: string): string {
+  return markdown
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/^#+\s+/gm, "")
+    .replace(/[*_`>#-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 4000)
 }
 
 function getOpenRouter(): OpenRouter {
@@ -82,4 +100,27 @@ export async function generateArticle(params: {
     throw new Error("AI returned an empty article")
   }
   return { body, model }
+}
+
+export async function generateArticleExcerpt(params: {
+  title: string
+  body: string
+}): Promise<string> {
+  const openrouter = getOpenRouter()
+  const bodyText = stripMarkdownForExcerpt(params.body)
+  if (!bodyText) {
+    return params.title.trim().slice(0, 200)
+  }
+
+  const result = openrouter.callModel({
+    model: getExcerptModel(),
+    input: excerptGenerationPrompt({ title: params.title, bodyText }),
+    temperature: 0.5,
+    maxOutputTokens: 120,
+  })
+  const text = (await result.getText()).trim().replace(/^["']|["']$/g, "")
+  if (!text) {
+    return params.title.trim().slice(0, 200)
+  }
+  return text.slice(0, 2000)
 }
