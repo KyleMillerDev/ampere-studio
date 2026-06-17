@@ -8,6 +8,7 @@ import {
   Image01Icon,
   Delete01Icon,
   CheckmarkCircle01Icon,
+  SparklesIcon,
 } from "@hugeicons/core-free-icons"
 
 import {
@@ -27,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import type { StudioImage } from "@/lib/cms/images"
 import { useEditorStore } from "@/components/cms/editor/editor-store"
+import { AiImageGeneratePanel } from "@/components/cms/ai-image-generate-panel"
 import { cn } from "@/lib/utils"
 
 export function ImagePickerDialog() {
@@ -115,6 +117,10 @@ export function ImagePickerDialog() {
               <HugeiconsIcon icon={Upload01Icon} className="mr-1 size-4" />
               Upload
             </TabsTrigger>
+            <TabsTrigger value="generate">
+              <HugeiconsIcon icon={SparklesIcon} className="mr-1 size-4" />
+              Generate
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="gallery">
@@ -133,6 +139,15 @@ export function ImagePickerDialog() {
 
           <TabsContent value="upload">
             <UploadTab onUploaded={onUploaded} />
+          </TabsContent>
+
+          <TabsContent value="generate">
+            <AiImageGeneratePanel
+              mode="media"
+              onGenerated={(image) => {
+                onUploaded(image)
+              }}
+            />
           </TabsContent>
         </Tabs>
 
@@ -229,7 +244,7 @@ function GalleryTab({
               <span
                 role="button"
                 tabIndex={0}
-                className="absolute top-2 left-2 flex size-6 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive hover:text-destructive-foreground"
+                className="hover:text-destructive-foreground absolute top-2 left-2 flex size-6 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive"
                 aria-label="Delete image"
                 onClick={async (e) => {
                   e.preventDefault()
@@ -264,7 +279,11 @@ function GalleryTab({
   )
 }
 
-function UploadTab({ onUploaded }: { onUploaded: (image: StudioImage) => void }) {
+function UploadTab({
+  onUploaded,
+}: {
+  onUploaded: (image: StudioImage) => void
+}) {
   const [file, setFile] = useState<File | null>(null)
   const [alt, setAlt] = useState("")
   const [uploading, setUploading] = useState(false)
@@ -289,10 +308,7 @@ function UploadTab({ onUploaded }: { onUploaded: (image: StudioImage) => void })
     })
   }
 
-  async function uploadWithProgress(
-    url: string,
-    file: File
-  ): Promise<void> {
+  async function uploadWithProgress(url: string, file: File): Promise<void> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       xhr.open("PUT", url)
@@ -355,7 +371,9 @@ function UploadTab({ onUploaded }: { onUploaded: (image: StudioImage) => void })
         const err = (await finalizeRes.json().catch(() => ({}))) as {
           error?: string
         }
-        throw new Error(err.error ?? `Finalize failed with ${finalizeRes.status}`)
+        throw new Error(
+          err.error ?? `Finalize failed with ${finalizeRes.status}`
+        )
       }
       const { image: finalized } = (await finalizeRes.json()) as {
         image: StudioImage

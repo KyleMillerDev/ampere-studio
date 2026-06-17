@@ -48,6 +48,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import type { StudioImage } from "@/lib/cms/images"
 import {
@@ -60,6 +61,7 @@ import {
   markdownImageSnippet,
   uploadStudioImage,
 } from "@/lib/cms/upload-studio-image"
+import { AiImageGeneratePanel } from "@/components/cms/ai-image-generate-panel"
 
 const devPaymentBypass = isAiArticlePaymentBypassed()
 
@@ -90,6 +92,7 @@ export function ArticleEditor({ initial }: ArticleEditorProps) {
   const [generating, setGenerating] = useState(false)
   const [writeConfirmOpen, setWriteConfirmOpen] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [generatingThumbnail, setGeneratingThumbnail] = useState(false)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
 
@@ -398,12 +401,13 @@ export function ArticleEditor({ initial }: ArticleEditorProps) {
 
           <div className="space-y-2">
             <Label htmlFor="article-thumbnail">Thumbnail URL</Label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Input
                 id="article-thumbnail"
                 value={thumbnailUrl}
                 onChange={(e) => setThumbnailUrl(e.target.value)}
                 placeholder="https://..."
+                className="min-w-[200px] flex-1"
               />
               <Button
                 type="button"
@@ -412,6 +416,50 @@ export function ArticleEditor({ initial }: ArticleEditorProps) {
               >
                 <HugeiconsIcon icon={Image01Icon} className="mr-1 size-4" />
                 Library
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={generatingThumbnail || !title.trim() || !body.trim()}
+                onClick={async () => {
+                  setGeneratingThumbnail(true)
+                  try {
+                    const res = await fetch("/api/images/generate", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        source: "article",
+                        title: title.trim(),
+                        body,
+                        alt: title.trim() || undefined,
+                      }),
+                    })
+                    if (!res.ok) {
+                      const err = (await res.json().catch(() => ({}))) as {
+                        error?: string
+                      }
+                      throw new Error(
+                        err.error ?? "Thumbnail generation failed"
+                      )
+                    }
+                    const data = (await res.json()) as { image: StudioImage }
+                    setThumbnailUrl(data.image.s3Url)
+                    toast.success(
+                      "Thumbnail generated and saved to your media library"
+                    )
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : "Could not generate thumbnail"
+                    )
+                  } finally {
+                    setGeneratingThumbnail(false)
+                  }
+                }}
+              >
+                <HugeiconsIcon icon={SparklesIcon} className="mr-1 size-4" />
+                {generatingThumbnail ? "Generating..." : "Generate thumbnail"}
               </Button>
             </div>
             {thumbnailUrl ? (
@@ -537,6 +585,8 @@ export function ArticleEditor({ initial }: ArticleEditorProps) {
       <ThumbnailPickerDialog
         open={pickerOpen}
         onOpenChange={setPickerOpen}
+        articleTitle={title}
+        articleBody={body}
         onSelect={(url) => {
           setThumbnailUrl(url)
           setPickerOpen(false)
@@ -569,10 +619,14 @@ function ThumbnailPickerDialog({
   open,
   onOpenChange,
   onSelect,
+  articleTitle,
+  articleBody,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSelect: (url: string) => void
+  articleTitle: string
+  articleBody: string
 }) {
   const [images, setImages] = useState<StudioImage[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -608,70 +662,99 @@ function ThumbnailPickerDialog({
         <DialogHeader>
           <DialogTitle>Choose thumbnail</DialogTitle>
           <DialogDescription>
-            Pick an image from your media library for the article thumbnail.
+            Pick an image from your media library, or generate one from your
+            article content.
           </DialogDescription>
         </DialogHeader>
 
-        {loadError ? (
-          <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Could not load the media library: {loadError}
-          </div>
-        ) : images === null ? (
-          <div className="grid grid-cols-3 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-square rounded-md" />
-            ))}
-          </div>
-        ) : images.length === 0 ? (
-          <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No images uploaded yet. Upload images from the content editor media
-            library first.
-          </div>
-        ) : (
-          <ScrollArea className="h-[360px] pr-3">
-            <div className="grid grid-cols-3 gap-3">
-              {images.map((img) => {
-                const isSelected = selected === img.s3Url
-                return (
-                  <button
-                    type="button"
-                    key={img.id}
-                    onClick={() => setSelected(img.s3Url)}
-                    className={cn(
-                      "group relative overflow-hidden rounded-md border bg-muted text-left transition-colors",
-                      isSelected
-                        ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                        : "hover:border-foreground/30"
-                    )}
-                  >
-                    <div className="aspect-square w-full overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={img.s3Url}
-                        alt={img.alt || img.filename}
-                        className="size-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                    <div className="space-y-0.5 p-2">
-                      <p className="truncate text-xs font-medium">
-                        {img.filename}
-                      </p>
-                    </div>
-                    {isSelected ? (
-                      <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <HugeiconsIcon
-                          icon={CheckmarkCircle01Icon}
-                          className="size-4"
-                        />
-                      </span>
-                    ) : null}
-                  </button>
-                )
-              })}
-            </div>
-          </ScrollArea>
-        )}
+        <Tabs defaultValue="gallery">
+          <TabsList className="mb-3">
+            <TabsTrigger value="gallery">
+              <HugeiconsIcon icon={Image01Icon} className="mr-1 size-4" />
+              Gallery
+            </TabsTrigger>
+            <TabsTrigger value="generate">
+              <HugeiconsIcon icon={SparklesIcon} className="mr-1 size-4" />
+              Generate
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="gallery">
+            {loadError ? (
+              <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+                Could not load the media library: {loadError}
+              </div>
+            ) : images === null ? (
+              <div className="grid grid-cols-3 gap-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-square rounded-md" />
+                ))}
+              </div>
+            ) : images.length === 0 ? (
+              <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+                No images uploaded yet. Upload images from the content editor
+                media library first.
+              </div>
+            ) : (
+              <ScrollArea className="h-[360px] pr-3">
+                <div className="grid grid-cols-3 gap-3">
+                  {images.map((img) => {
+                    const isSelected = selected === img.s3Url
+                    return (
+                      <button
+                        type="button"
+                        key={img.id}
+                        onClick={() => setSelected(img.s3Url)}
+                        className={cn(
+                          "group relative overflow-hidden rounded-md border bg-muted text-left transition-colors",
+                          isSelected
+                            ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                            : "hover:border-foreground/30"
+                        )}
+                      >
+                        <div className="aspect-square w-full overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={img.s3Url}
+                            alt={img.alt || img.filename}
+                            className="size-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="space-y-0.5 p-2">
+                          <p className="truncate text-xs font-medium">
+                            {img.filename}
+                          </p>
+                        </div>
+                        {isSelected ? (
+                          <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                            <HugeiconsIcon
+                              icon={CheckmarkCircle01Icon}
+                              className="size-4"
+                            />
+                          </span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+            )}
+          </TabsContent>
+
+          <TabsContent value="generate">
+            <AiImageGeneratePanel
+              mode="article"
+              articleTitle={articleTitle}
+              articleBody={articleBody}
+              compact
+              onGenerated={(image) => {
+                setImages((prev) => (prev ? [image, ...prev] : [image]))
+                setSelected(image.s3Url)
+              }}
+            />
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

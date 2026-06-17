@@ -92,3 +92,33 @@ Rules:
 - NEVER use these words: ${BANNED_WORDS.join(", ")}
 - Return only the excerpt text, nothing else`
 }
+
+export const IMAGE_PROMPT_INSTRUCTIONS = `You are an expert prompt engineer for AI image generation models. Your job is to turn rough user ideas into vivid, specific image prompts that produce professional marketing graphics.
+
+Rules for every prompt you write:
+- Output a single paragraph prompt only. No preamble, labels, quotes, or markdown.
+- Describe subject, composition, lighting, color palette, mood, and style clearly.
+- Prefer photorealistic or polished editorial illustration styles unless the user asks otherwise.
+- Avoid text in the image unless the user explicitly wants words rendered in the graphic.
+- Keep prompts safe for work and suitable for a small business website.
+- Do not mention AI, models, or prompts in the output.`
+
+export function mediaImagePromptRewrite(userText: string): string {
+  return `Rewrite this image idea into a detailed image generation prompt for a 1024x1024 marketing graphic:
+
+"${userText.trim()}"`
+}
+
+export function articleThumbnailPromptRewrite(params: {
+  title: string
+  bodyText: string
+}): string {
+  return `Write an image generation prompt for a blog article thumbnail (1024x1024).
+
+Article title: ${params.title.trim()}
+
+Article content summary:
+${params.bodyText.trim()}
+
+The thumbnail should visually represent the article topic, feel professional and inviting, and work as a hero image on a business blog. Avoid clutter and avoid rendering long text in the image.`
+}

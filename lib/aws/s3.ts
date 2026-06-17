@@ -19,6 +19,21 @@ export function publicUrlFor(key: string): string {
   return `https://${IMAGES_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${encodeURI(key)}`
 }
 
+export async function putObjectBuffer(params: {
+  key: string
+  body: Buffer | Uint8Array
+  contentType: string
+}): Promise<void> {
+  await getS3().send(
+    new PutObjectCommand({
+      Bucket: IMAGES_BUCKET,
+      Key: params.key,
+      Body: params.body,
+      ContentType: params.contentType,
+    })
+  )
+}
+
 export async function presignedPutUrl(params: {
   key: string
   contentType: string
