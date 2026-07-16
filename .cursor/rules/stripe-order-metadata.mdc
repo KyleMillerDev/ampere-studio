@@ -1,0 +1,200 @@
+---
+description: Canonical Stripe order data contract for all Ampere Studio tenants. Always apply when writing or reviewing code under lib/stripe/orders*, lib/stripe/catalog*, app/api/stripe/orders/*, app/(dashboard)/orders/*, or components/cms/stripe/orders/*.
+globs:
+  - lib/stripe/orders*
+  - lib/stripe/catalog*
+  - app/api/stripe/orders/**
+  - app/(dashboard)/orders/**
+  - components/cms/stripe/orders/**
+alwaysApply: false
+---
+
+# Stripe Order Data Contract
+
+This rule documents the canonical order model used across all Stripe-enabled
+tenants in Ampere Studio. Every future Stripe site added to this dashboard MUST
+follow this contract exactly.
+
+---
+
+## 1. Orders are Stripe PaymentIntents
+
+- An order IS a `PaymentIntent`. There is no separate orders database.
+- **Only `succeeded` PaymentIntents are real orders.** Never display
+  `requires_payment_method`, `requires_confirmation`, `requires_action`,
+  `processing`, or `canceled` PIs on the orders list.
+- Always expand `latest_charge` when fetching PIs for order data.
+
+---
+
+## 2. Per-tenant configuration (never hardcode)
+
+Every value comes from the `Ampere-Clients` DynamoDB record keyed by
+`client_id`. Relevant fields (resolved via `lib/cms/clients.ts`):
+
+| Field                    | Source                                    | Notes                                                         |
+| ------------------------ | ----------------------------------------- | ------------------------------------------------------------- |
+| Stripe keys              | AWS Secrets Manager `ampere/clients/keys` | `{client_id}_stripe_secret`, `{client_id}_stripe_publishable` |
+| Client site base URL     | `client.domain`                           | Used to build customer-facing links                           |
+| Order lookup path        | `client.order_lookup_path`                | Default: `/orders/lookup`                                     |
+| Order notification email | `client.order_email_notif`                | Falls back to `client.email`                                  |
+| Brand primary color      | `client.primary_color`                    | Hex string; default `#111111` for emails                      |
+| Logo URL                 | `client.logo_url`                         | Used in email header                                          |
+
+---
+
+## 3. PaymentIntent fields used for order data
+
+| PI field        | Purpose                                                                         |
+| --------------- | ------------------------------------------------------------------------------- |
+| `id`            | Order ID. Confirmation number = `id.slice(-12).toUpperCase()`                   |
+| `amount`        | Order TOTAL in cents (subtotal + shipping). Source of truth.                    |
+| `currency`      | Always `"usd"` for Cab Fresh; use as-is for display.                            |
+| `status`        | Must be `"succeeded"` to be a real order.                                       |
+| `created`       | Unix seconds; order placed date.                                                |
+| `receipt_email` | Primary customer email. Fallback: `charge.billing_details.email`.               |
+| `shipping`      | `{ name, phone, address: { line1, line2, city, state, postal_code, country } }` |
+| `latest_charge` | Expand to read billing email, dispute status, refund state.                     |
+
+---
+
+## 4. Metadata schema (the contract — never drop existing keys on update)
+
+All metadata values are **strings** (Stripe stores them that way).
+
+| Key                   | Type                   | Description                                                                                                      |
+| --------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `lines`               | string                 | Line items. Format: `"{productId}x{qty}\|{productId}x{qty}\|..."`. Max 480 chars. Parse with `/^(.+?)x(\d+)$/i`. |
+| `subtotal`            | string (integer cents) | Subtotal in cents, not including shipping.                                                                       |
+| `shipping`            | string (integer cents) | Shipping cost in cents.                                                                                          |
+| `shipping_source`     | string                 | `"rate-table"` or `"easypost"` (informational, written by the client site).                                      |
+| `tracking`            | string                 | Carrier tracking number. May be empty.                                                                           |
+| `tracking_carrier`    | string                 | One of `"USPS" \| "UPS" \| "FEDEX" \| "Other"`. Written by this dashboard.                                       |
+| `status_override`     | string                 | One of `"shipped" \| "complete" \| "cancelled"`. Written by this dashboard via Change Status.                    |
+| `shipped_at`          | string (unix seconds)  | Set the first time tracking is added. Written by this dashboard.                                                 |
+| `outstanding_invoice` | string                 | Stripe Invoice ID. Set when an edit raises the total (delta collected via Invoice).                              |
+
+**CRITICAL: Always merge metadata on update.** Retrieve the PI, spread
+`pi.metadata`, then set your keys. Stripe replaces the entire metadata object
+on `paymentIntents.update`, so any key not included is permanently deleted.
+
+```ts
+// Correct pattern
+const pi = await stripe.paymentIntents.retrieve(id)
+await stripe.paymentIntents.update(id, {
+  metadata: {
+    ...pi.metadata,  // preserve existing keys
+    tracking: "1Z999AA10123456784",
+    tracking_carrier: "UPS",
+  },
+})
+```
+
+---
+
+## 5. Line-item enrichment
+
+1. Parse `metadata.lines` into `{ ref, quantity }[]` using `parseLineMetadata`.
+2. Fetch all active Stripe products with `expand: ["data.default_price"]`.
+3. Build a `CatalogMap` keyed by `product.id`, `product.metadata.part_number`,
+   and `product.metadata.slug` for resilient matching.
+4. For each ref, match in that order. Produce:
+   `{ ref, productId, name, slug, image: images[0], quantity, unitAmount: default_price.unit_amount, lineTotal }`.
+5. If no match: `name = "Missing (<ref>)"`, `image = null`, `unitAmount = null`.
+
+---
+
+## 6. Derived order status (badge) — priority order
+
+Given a `succeeded` PaymentIntent, compute the display status:
+
+1. **Disputed** — `latest_charge` has an active dispute (not `won` or `lost`).
+2. **Cancelled** — `metadata.status_override === "cancelled"` OR charge is fully refunded.
+3. **Complete** — `metadata.status_override === "complete"`.
+4. **Shipped** — `metadata.status_override === "shipped"` OR `metadata.tracking` is non-empty.
+5. **Paid** — default fallback.
+
+`status_override` always wins over tracking-based inference. Set it explicitly
+via the "Change Status" action (writes to `metadata.status_override`).
+
+---
+
+## 7. Customer email resolution
+
+```ts
+function getCustomerEmail(pi: Stripe.PaymentIntent): string | null {
+  if (pi.receipt_email) return pi.receipt_email
+  const charge = pi.latest_charge
+  if (charge && typeof charge !== 'string') {
+    return charge.billing_details?.email ?? null
+  }
+  return null
+}
+```
+
+---
+
+## 8. Carrier tracking URLs
+
+| Carrier | URL                                                               |
+| ------- | ----------------------------------------------------------------- |
+| USPS    | `https://tools.usps.com/go/TrackConfirmAction?tLabels={tracking}` |
+| UPS     | `https://www.ups.com/track?tracknum={tracking}`                   |
+| FEDEX   | `https://www.fedex.com/fedextrack/?trknbr={tracking}`             |
+| Other   | Display number only, no link.                                     |
+
+---
+
+## 9. Customer order-status link format
+
+When sending shipment notification emails, link customers to the client site's
+order-lookup page:
+
+```
+{client.domain}{client.order_lookup_path}?order_number={pi.id}&order_email={encodeURIComponent(customerEmail)}
+```
+
+Example:
+`https://www.cabfreshfiltercompany.com/orders/lookup?order_number=pi_3Pxyz...&order_email=customer%40example.com`
+
+The client site reads `order_number` and `order_email`, prefills the form,
+and auto-submits. This is the canonical template — all Stripe sites must
+implement the same lookup page behavior.
+
+---
+
+## 10. Dashboard order detail link (for business notification emails)
+
+```
+{requestOrigin(req)}/orders/{pi.id}
+```
+
+Use `requestOrigin` from `lib/url.ts` to derive the dashboard origin from
+request headers. Do not hardcode the dashboard URL.
+
+---
+
+## 11. Edit reconciliation (succeeded PI)
+
+A `succeeded` PI's captured amount cannot be increased in place:
+
+- **New total LOWER**: issue a partial refund via `refunds.create({ payment_intent, amount: diff })`.
+- **New total HIGHER**: create a Stripe Invoice for the delta, finalize and send it. Record the Invoice ID in `metadata.outstanding_invoice`.
+
+Always keep `metadata.lines`, `metadata.subtotal`, and `metadata.shipping`
+consistent with the intended order contents (not necessarily with the net-charged
+amount after partial refunds).
+
+---
+
+## 12. Stripe gates — never skip
+
+Before any order read/write, verify:
+
+```ts
+const catalog = await getActiveCatalogProvider()  // must be "stripe"
+const keys = await getStripeKeys()                 // must be non-null
+```
+
+Use `isStripeOrdersEnabled()` from `lib/stripe/config.ts` for a single-call
+convenience check. Redirect to `/dashboard` in pages; return 503 in API routes.

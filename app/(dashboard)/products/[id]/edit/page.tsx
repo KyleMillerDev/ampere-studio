@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation"
 
 import { PageHeading } from "@/components/cms/page-heading"
 import { StripeProductForm } from "@/components/cms/stripe/stripe-product-form"
+import { getActiveCatalogProvider } from "@/lib/cms/clients"
 import { getStripeKeys } from "@/lib/stripe/config"
 import { getMetadataSuggestions, getStripeProduct } from "@/lib/stripe/products"
 
@@ -11,8 +12,10 @@ type Props = { params: Promise<{ id: string }> }
 
 export default async function EditStripeProductPage({ params }: Props) {
   const { id } = await params
+  const catalog = await getActiveCatalogProvider()
+  if (catalog !== "stripe") redirect(`/products/${id}`)
+
   const stripeKeys = await getStripeKeys()
-  // CMS mode edits products at /products/[id] directly.
   if (!stripeKeys) redirect(`/products/${id}`)
 
   const [product, suggestions] = await Promise.all([

@@ -21,18 +21,21 @@ const LABELS: Record<string, string> = {
   dashboard: "Overview",
   products: "Products",
   categories: "Categories",
+  orders: "Orders",
   analytics: "Analytics",
   "sales-overview": "Sales overview",
   submissions: "Submissions",
   account: "Account",
   security: "Security",
   new: "New",
+  edit: "Edit",
 }
 
 function prettify(segment: string): string {
   if (LABELS[segment]) return LABELS[segment]
   if (segment.startsWith("prod_")) return "Edit product"
   if (segment.startsWith("cat_")) return "Edit category"
+  if (segment.startsWith("pi_")) return "Order details"
   return segment.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase())
 }
 

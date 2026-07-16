@@ -1,0 +1,38 @@
+"use client"
+
+import { Badge } from "@/components/ui/badge"
+import type { OrderStatus } from "@/lib/stripe/orders"
+
+const STATUS_VARIANT: Record<
+  OrderStatus,
+  "default" | "secondary" | "outline" | "destructive"
+> = {
+  Paid: "secondary",
+  Shipped: "default",
+  Complete: "default",
+  Cancelled: "outline",
+  Disputed: "destructive",
+}
+
+const STATUS_CLASS: Record<OrderStatus, string> = {
+  Paid: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300",
+  Shipped:
+    "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300",
+  Complete:
+    "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300",
+  Cancelled: "text-muted-foreground",
+  Disputed:
+    "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300",
+}
+
+interface OrderStatusBadgeProps {
+  status: OrderStatus
+}
+
+export function OrderStatusBadge({ status }: OrderStatusBadgeProps) {
+  return (
+    <Badge variant={STATUS_VARIANT[status]} className={STATUS_CLASS[status]}>
+      {status}
+    </Badge>
+  )
+}

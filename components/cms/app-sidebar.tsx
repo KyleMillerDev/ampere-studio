@@ -14,6 +14,8 @@ import {
   PencilEdit01Icon,
   SparklesIcon,
   News01Icon,
+  TruckIcon,
+  ShoppingCart01Icon,
 } from "@hugeicons/core-free-icons"
 
 import {
@@ -30,6 +32,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { UserMenu } from "@/components/cms/user-menu"
+import type { ClientFeatures } from "@/lib/cms/client-features"
 
 type NavEntry = {
   title: string
@@ -38,37 +41,94 @@ type NavEntry = {
   matchPrefix?: boolean
 }
 
-const workspaceNav: NavEntry[] = [
-  { title: "Overview", href: "/dashboard", icon: DashboardSquare01Icon },
-  {
-    title: "Products",
-    href: "/products",
-    icon: PackageIcon,
-    matchPrefix: true,
-  },
-  { title: "Categories", href: "/products/categories", icon: Folder01Icon },
-  { title: "Articles", href: "/articles", icon: News01Icon, matchPrefix: true },
-  {
-    title: "Submissions",
-    href: "/submissions",
-    icon: InboxIcon,
-    matchPrefix: true,
-  },
-]
+function buildWorkspaceNav(
+  features: ClientFeatures,
+  ordersEnabled: boolean
+): NavEntry[] {
+  const items: NavEntry[] = [
+    { title: "Overview", href: "/dashboard", icon: DashboardSquare01Icon },
+  ]
 
-const insightsNav: NavEntry[] = [
-  { title: "Analytics", href: "/analytics", icon: ChartBarLineIcon },
-  { title: "Sales overview", href: "/sales-overview", icon: DollarCircleIcon },
-]
+  if (features.catalog) {
+    items.push(
+      {
+        title: "Products",
+        href: "/products",
+        icon: PackageIcon,
+        matchPrefix: true,
+      },
+      {
+        title: "Categories",
+        href: "/products/categories",
+        icon: Folder01Icon,
+      }
+    )
+  }
 
-const editorNav: NavEntry[] = [
-  {
-    title: "Content editor",
-    href: "/content",
-    icon: PencilEdit01Icon,
-    matchPrefix: true,
-  },
-]
+  if (ordersEnabled) {
+    items.push({
+      title: "Orders",
+      href: "/orders",
+      icon: ShoppingCart01Icon,
+      matchPrefix: true,
+    })
+  }
+
+  if (features.blog) {
+    items.push({
+      title: "Articles",
+      href: "/articles",
+      icon: News01Icon,
+      matchPrefix: true,
+    })
+  }
+
+  if (features.submissions) {
+    items.push({
+      title: "Submissions",
+      href: "/submissions",
+      icon: InboxIcon,
+      matchPrefix: true,
+    })
+  }
+
+  if (features.rentals) {
+    items.push({
+      title: "Rentals",
+      href: "/rentals",
+      icon: TruckIcon,
+      matchPrefix: true,
+    })
+  }
+
+  return items
+}
+
+function buildInsightsNav(features: ClientFeatures): NavEntry[] {
+  if (!features.analytics) return []
+
+  return [
+    { title: "Analytics", href: "/analytics", icon: ChartBarLineIcon },
+    {
+      title: "Sales overview",
+      href: "/sales-overview",
+      icon: DollarCircleIcon,
+    },
+  ]
+}
+
+function buildEditorNav(features: ClientFeatures): NavEntry[] {
+  if (!features.siteEditor) return []
+
+  return [
+    {
+      title: "Content editor",
+      href: "/content",
+      icon: PencilEdit01Icon,
+      matchPrefix: true,
+    },
+  ]
+}
 
 function isActive(pathname: string, entry: NavEntry): boolean {
   if (entry.matchPrefix) {
@@ -92,6 +152,8 @@ function NavGroup({
   items: NavEntry[]
   pathname: string
 }) {
+  if (items.length === 0) return null
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
@@ -114,11 +176,20 @@ function NavGroup({
 }
 
 interface AppSidebarProps {
-  clientId: string
+  clientName: string
+  features: ClientFeatures
+  ordersEnabled?: boolean
 }
 
-export function AppSidebar({ clientId }: AppSidebarProps) {
+export function AppSidebar({
+  clientName,
+  features,
+  ordersEnabled = false,
+}: AppSidebarProps) {
   const pathname = usePathname() ?? "/"
+  const workspaceNav = buildWorkspaceNav(features, ordersEnabled)
+  const insightsNav = buildInsightsNav(features)
+  const editorNav = buildEditorNav(features)
 
   return (
     <Sidebar collapsible="icon">
@@ -132,7 +203,7 @@ export function AppSidebar({ clientId }: AppSidebarProps) {
               Ampere Studio
             </span>
             <span className="truncate text-xs text-muted-foreground">
-              Client: {clientId}
+              {clientName}
             </span>
           </div>
         </div>

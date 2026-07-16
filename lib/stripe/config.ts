@@ -2,6 +2,7 @@ import Stripe from "stripe"
 
 import { getClientKeysSecret } from "@/lib/aws/secrets"
 import { getActiveClientId } from "@/lib/cms/client-context"
+import { getActiveCatalogProvider } from "@/lib/cms/clients"
 
 export interface StripeKeys {
   publishableKey: string
@@ -36,4 +37,17 @@ export async function getStripeClient(): Promise<Stripe | null> {
     cachedClientKey = keys.secretKey
   }
   return cachedClient
+}
+
+/**
+ * Returns true when the active client has catalog="stripe" AND valid Stripe
+ * keys in Secrets Manager. Used to gate the Orders tab/pages, mirroring the
+ * same check on the Products pages.
+ */
+export async function isStripeOrdersEnabled(): Promise<boolean> {
+  const [catalog, keys] = await Promise.all([
+    getActiveCatalogProvider(),
+    getStripeKeys(),
+  ])
+  return catalog === "stripe" && keys !== null
 }

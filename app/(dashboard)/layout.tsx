@@ -7,7 +7,12 @@ import {
   getActiveClientId,
   isDevClientSwitchEnabled,
 } from "@/lib/cms/client-context"
-import { listClients } from "@/lib/cms/clients"
+import {
+  getActiveClient,
+  getActiveClientFeatures,
+  listClients,
+} from "@/lib/cms/clients"
+import { isStripeOrdersEnabled } from "@/lib/stripe/config"
 
 export default async function DashboardLayout({
   children,
@@ -17,13 +22,22 @@ export default async function DashboardLayout({
   const cookieStore = await cookies()
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false"
   const activeClientId = await getActiveClientId()
+  const [activeClient, features, ordersEnabled] = await Promise.all([
+    getActiveClient(),
+    getActiveClientFeatures(),
+    isStripeOrdersEnabled().catch(() => false),
+  ])
   const devClients = isDevClientSwitchEnabled()
     ? await listClients().catch(() => [])
     : []
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar clientId={activeClientId} />
+      <AppSidebar
+        clientName={activeClient.name}
+        features={features}
+        ordersEnabled={ordersEnabled}
+      />
       <SidebarInset>
         <DashboardHeader
           activeClientId={activeClientId}
