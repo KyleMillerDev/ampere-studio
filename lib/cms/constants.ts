@@ -18,7 +18,7 @@
 export const CLIENT_ID: string =
   process.env.AMPERE_DEFAULT_CLIENT_ID?.trim() || "ampere"
 
-export const AWS_REGION = "us-east-2"
+export const AWS_REGION = process.env.AMPERE_AWS_REGION?.trim() || "us-east-2"
 
 export const CONTENT_TABLE = "Ampere-Studio-Content"
 export const SUBMISSIONS_TABLE = "Ampere-Sites-Form-Submissions"
@@ -35,6 +35,7 @@ export const SK_PREFIX = {
   category: "cat_",
   image: "img_",
   article: "art_",
+  rental: "rent_",
 } as const
 
 export type ContentType = keyof typeof SK_PREFIX
