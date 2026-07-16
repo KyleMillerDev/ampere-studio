@@ -27,6 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import type { StudioImage } from "@/lib/cms/images"
+import { uploadPendingImageFile } from "@/lib/cms/upload-studio-image"
 import { useEditorStore } from "@/components/cms/editor/editor-store"
 import { AiImageGeneratePanel } from "@/components/cms/ai-image-generate-panel"
 import { cn } from "@/lib/utils"
@@ -308,25 +309,6 @@ function UploadTab({
     })
   }
 
-  async function uploadWithProgress(url: string, file: File): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      xhr.open("PUT", url)
-      xhr.setRequestHeader("Content-Type", file.type)
-      xhr.upload.addEventListener("progress", (e) => {
-        if (e.lengthComputable) {
-          setProgress(Math.round((e.loaded / e.total) * 100))
-        }
-      })
-      xhr.addEventListener("load", () => {
-        if (xhr.status >= 200 && xhr.status < 300) resolve()
-        else reject(new Error(`Upload failed with ${xhr.status}`))
-      })
-      xhr.addEventListener("error", () => reject(new Error("Upload failed")))
-      xhr.send(file)
-    })
-  }
-
   async function handleUpload() {
     if (!file) return
     setUploading(true)
@@ -350,12 +332,13 @@ function UploadTab({
         }
         throw new Error(err.error ?? `Presign failed with ${presignRes.status}`)
       }
-      const { image, uploadUrl } = (await presignRes.json()) as {
+      const { image } = (await presignRes.json()) as {
         image: StudioImage
-        uploadUrl: string
       }
 
-      await uploadWithProgress(uploadUrl, file)
+      setProgress(50)
+      await uploadPendingImageFile(image.id, file)
+      setProgress(90)
 
       const finalizeRes = await fetch(`/api/images/${image.id}/finalize`, {
         method: "POST",

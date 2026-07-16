@@ -21,6 +21,8 @@ import { getProduct } from "@/lib/cms/products"
 import { getStripeKeys } from "@/lib/stripe/config"
 import { getStripeProduct, listPricesForProduct } from "@/lib/stripe/products"
 import { formatUnixDate } from "@/lib/utils"
+import { isSquareEnabled } from "@/lib/square/config"
+import { getSquareProduct } from "@/lib/square/products"
 
 export const dynamic = "force-dynamic"
 
@@ -140,6 +142,135 @@ export default async function ProductDetailPage({ params }: Props) {
                 )}
               </CardContent>
             </Card>
+          </div>
+        </div>
+      )
+    }
+  }
+
+  if (catalog === "square") {
+    const enabled = await isSquareEnabled()
+    if (enabled) {
+      const product = await getSquareProduct(id)
+      if (!product) notFound()
+      const variations = product.item_data.variations ?? []
+      const firstPrice = variations[0]?.item_variation_data.price_money.amount
+
+      return (
+        <div className="space-y-6">
+          <PageHeading
+            title={product.item_data.name}
+            description={`Square item ${product.raw_id}`}
+            actions={
+              <Button asChild>
+                <Link href={`/products/${product.raw_id}/edit`}>
+                  <HugeiconsIcon
+                    icon={PencilEdit01Icon}
+                    className="mr-1 size-4"
+                  />
+                  Edit product
+                </Link>
+              </Button>
+            }
+          />
+          <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  Overview
+                  <Badge
+                    variant={
+                      product.km_status === "Published"
+                        ? "default"
+                        : "secondary"
+                    }
+                  >
+                    {product.km_status}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {product.item_data.description_html ? (
+                  <div
+                    className="text-sm"
+                    dangerouslySetInnerHTML={{
+                      __html: product.item_data.description_html,
+                    }}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No description.
+                  </p>
+                )}
+                {(product.item_data.image_urls ?? []).length > 0 && (
+                  <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                    {(product.item_data.image_urls ?? []).map((url, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={i}
+                        src={url}
+                        alt=""
+                        className="aspect-square rounded border object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Variations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <dl className="space-y-2">
+                    {variations.map((v) => (
+                      <div
+                        key={v.id}
+                        className="flex items-center justify-between"
+                      >
+                        <dt className="text-sm">
+                          {v.item_variation_data.name}
+                        </dt>
+                        <dd className="text-sm font-medium">
+                          $
+                          {(
+                            v.item_variation_data.price_money.amount / 100
+                          ).toFixed(2)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </CardContent>
+              </Card>
+              {product.options && product.options.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Options</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {product.options.map((o) => (
+                      <div key={o.id} className="mb-2">
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">
+                          {o.item_option_data.name}
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {o.item_option_data.values.map((v) => (
+                            <Badge
+                              key={v.id}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {v.item_option_value_data.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         </div>
       )

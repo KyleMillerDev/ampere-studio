@@ -12,7 +12,9 @@ import {
   getActiveClientFeatures,
   listClients,
 } from "@/lib/cms/clients"
+import { countUnreadSubmissions } from "@/lib/cms/submissions"
 import { isStripeOrdersEnabled } from "@/lib/stripe/config"
+import { isSquareEnabled, isSquareOrdersEnabled } from "@/lib/square/config"
 
 export default async function DashboardLayout({
   children,
@@ -22,14 +24,32 @@ export default async function DashboardLayout({
   const cookieStore = await cookies()
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false"
   const activeClientId = await getActiveClientId()
-  const [activeClient, features, ordersEnabled] = await Promise.all([
+  const [activeClient, features] = await Promise.all([
     getActiveClient(),
     getActiveClientFeatures(),
-    isStripeOrdersEnabled().catch(() => false),
   ])
+
+  // Load order / Square flags conditionally based on catalog provider
+  let ordersEnabled = false
+  let squareEnabled = false
+  let squareOrdersEnabled = false
+
+  if (features.catalog === "stripe") {
+    ordersEnabled = await isStripeOrdersEnabled().catch(() => false)
+  } else if (features.catalog === "square") {
+    squareEnabled = await isSquareEnabled().catch(() => false)
+    squareOrdersEnabled = squareEnabled
+      ? await isSquareOrdersEnabled().catch(() => false)
+      : false
+  }
+
   const devClients = isDevClientSwitchEnabled()
     ? await listClients().catch(() => [])
     : []
+
+  const unreadSubmissionsCount = features.submissions
+    ? await countUnreadSubmissions().catch(() => 0)
+    : 0
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
@@ -37,6 +57,11 @@ export default async function DashboardLayout({
         clientName={activeClient.name}
         features={features}
         ordersEnabled={ordersEnabled}
+        squareEnabled={squareEnabled}
+        squareOrdersEnabled={squareOrdersEnabled}
+        unreadSubmissionsCount={unreadSubmissionsCount}
+        activeClientId={activeClientId}
+        devClients={devClients}
       />
       <SidebarInset>
         <DashboardHeader

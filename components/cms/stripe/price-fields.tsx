@@ -1,5 +1,6 @@
 "use client"
 
+import { DollarInput } from "@/components/ui/dollar-input"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -16,7 +17,7 @@ import type {
 
 export interface PriceDraft {
   currency: string
-  /** Amount in minor units (cents), held as a string for free typing. */
+  /** Amount in minor units (cents), stored as a string for form state. */
   amount: string
   type: "one_time" | "recurring"
   interval: "day" | "week" | "month" | "year"
@@ -72,7 +73,7 @@ export function priceDraftToInput(
   }
   const amount = Number(draft.amount)
   if (!Number.isInteger(amount) || amount <= 0) {
-    return { error: "Amount must be a positive whole number of cents" }
+    return { error: "Amount must be greater than zero" }
   }
   const intervalCount = Number(draft.intervalCount) || 1
   return {
@@ -103,18 +104,21 @@ export function PriceFields({ draft, onChange, idPrefix }: PriceFieldsProps) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <Label htmlFor={`${idPrefix}-amount`}>Amount (cents)</Label>
-          <Input
-            id={`${idPrefix}-amount`}
-            inputMode="numeric"
-            type="number"
-            min={1}
-            step={1}
-            placeholder="1299"
-            value={draft.amount}
-            onChange={(e) => patch({ amount: e.target.value })}
-          />
-          <p className="text-xs text-muted-foreground">$12.99 is 1299.</p>
+          <Label htmlFor={`${idPrefix}-amount`}>Amount</Label>
+          <div className="relative">
+            <span className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">
+              $
+            </span>
+            <DollarInput
+              id={`${idPrefix}-amount`}
+              className="pl-7"
+              allowEmpty
+              value={draft.amount.trim() ? Number(draft.amount) : undefined}
+              onChange={(cents) =>
+                patch({ amount: cents === undefined ? "" : String(cents) })
+              }
+            />
+          </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-currency`}>Currency</Label>

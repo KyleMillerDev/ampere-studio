@@ -23,7 +23,7 @@ import { Cancel01Icon, Upload01Icon } from "@hugeicons/core-free-icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import type { StudioImage } from "@/lib/cms/images"
+import { uploadStudioImage } from "@/lib/cms/upload-studio-image"
 import { STRIPE_MAX_IMAGES } from "@/lib/validation/stripe-product.schema"
 
 interface ProductImagesFieldProps {
@@ -57,25 +57,6 @@ export function ProductImagesField({
     onChange(arrayMove(images, from, to))
   }
 
-  async function uploadWithProgress(url: string, file: File): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      xhr.open("PUT", url)
-      xhr.setRequestHeader("Content-Type", file.type)
-      xhr.upload.addEventListener("progress", (e) => {
-        if (e.lengthComputable) {
-          setProgress(Math.round((e.loaded / e.total) * 100))
-        }
-      })
-      xhr.addEventListener("load", () => {
-        if (xhr.status >= 200 && xhr.status < 300) resolve()
-        else reject(new Error(`Upload failed with ${xhr.status}`))
-      })
-      xhr.addEventListener("error", () => reject(new Error("Upload failed")))
-      xhr.send(file)
-    })
-  }
-
   async function handleFileChange(file: File | null) {
     if (!file) return
     if (images.length >= STRIPE_MAX_IMAGES) {
@@ -85,36 +66,7 @@ export function ProductImagesField({
     setUploading(true)
     setProgress(0)
     try {
-      const presignRes = await fetch("/api/images", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type || "application/octet-stream",
-          sizeBytes: file.size,
-        }),
-      })
-      if (!presignRes.ok) {
-        const err = (await presignRes.json().catch(() => ({}))) as {
-          error?: string
-        }
-        throw new Error(err.error ?? `Presign failed with ${presignRes.status}`)
-      }
-      const { image, uploadUrl } = (await presignRes.json()) as {
-        image: StudioImage
-        uploadUrl: string
-      }
-
-      await uploadWithProgress(uploadUrl, file)
-
-      const finalizeRes = await fetch(`/api/images/${image.id}/finalize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sizeBytes: file.size }),
-      })
-      if (!finalizeRes.ok) {
-        throw new Error(`Finalize failed with ${finalizeRes.status}`)
-      }
+      const image = await uploadStudioImage(file)
       onChange([...images, image.s3Url])
       toast.success("Image uploaded")
     } catch (err) {

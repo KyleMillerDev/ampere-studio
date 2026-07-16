@@ -1,9 +1,13 @@
 import {
   SecretsManagerClient,
   GetSecretValueCommand,
+  PutSecretValueCommand,
+  CreateSecretCommand,
+  ResourceExistsException,
 } from "@aws-sdk/client-secrets-manager"
 
 import { AWS_REGION } from "@/lib/cms/constants"
+import type { SquareOAuthTokens } from "@/lib/square/types"
 
 /** Cached singleton so serverless runtimes do not rebuild the client on every request. */
 let client: SecretsManagerClient | null = null
@@ -49,4 +53,66 @@ export async function getClientKeysSecret(): Promise<Record<string, string>> {
     if (cachedSecret) return cachedSecret
     return {}
   }
+}
+
+// ─── Per-client Square secret cache ──────────────────────────────────────────
+
+const squareSecretCache = new Map<
+  string,
+  { data: SquareOAuthTokens; at: number }
+>()
+
+/**
+ * Fetch the Square OAuth tokens for a given client from Secrets Manager.
+ * Secret path: `{client_id}/square`.
+ * Returns null when the secret does not exist or cannot be read.
+ */
+export async function getSquareSecret(
+  clientId: string
+): Promise<SquareOAuthTokens | null> {
+  const now = Date.now()
+  const cached = squareSecretCache.get(clientId)
+  if (cached && now - cached.at < SECRET_CACHE_TTL_MS) return cached.data
+
+  try {
+    const res = await getSecretsManager().send(
+      new GetSecretValueCommand({ SecretId: `${clientId}/square` })
+    )
+    const raw = res.SecretString
+    if (!raw) return null
+    const data = JSON.parse(raw) as SquareOAuthTokens
+    squareSecretCache.set(clientId, { data, at: now })
+    return data
+  } catch {
+    return null
+  }
+}
+
+/** Store or update Square OAuth tokens for a client. */
+export async function putSquareSecret(
+  clientId: string,
+  tokens: SquareOAuthTokens
+): Promise<void> {
+  const secretId = `${clientId}/square`
+  const sm = getSecretsManager()
+  const secretString = JSON.stringify(tokens)
+
+  try {
+    await sm.send(
+      new CreateSecretCommand({ Name: secretId, SecretString: secretString })
+    )
+  } catch (err) {
+    if (err instanceof ResourceExistsException) {
+      await sm.send(
+        new PutSecretValueCommand({
+          SecretId: secretId,
+          SecretString: secretString,
+        })
+      )
+    } else {
+      throw err
+    }
+  }
+  // Bust the cache
+  squareSecretCache.delete(clientId)
 }

@@ -16,6 +16,9 @@ import {
   News01Icon,
   TruckIcon,
   ShoppingCart01Icon,
+  TicketIcon,
+  Settings01Icon,
+  CheckmarkSquare01Icon,
 } from "@hugeicons/core-free-icons"
 
 import {
@@ -27,23 +30,67 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { DevInviteUserDialog } from "@/components/cms/dev-invite-user-dialog"
 import { UserMenu } from "@/components/cms/user-menu"
 import type { ClientFeatures } from "@/lib/cms/client-features"
+import type { ClientOption } from "@/lib/cms/clients"
 
 type NavEntry = {
   title: string
   href: string
   icon: React.ComponentProps<typeof HugeiconsIcon>["icon"]
   matchPrefix?: boolean
+  badgeCount?: number
+}
+
+function appendSharedFeatureNav(
+  items: NavEntry[],
+  features: ClientFeatures,
+  unreadSubmissionsCount = 0
+): NavEntry[] {
+  const result = [...items]
+
+  if (features.blog) {
+    result.push({
+      title: "Articles",
+      href: "/articles",
+      icon: News01Icon,
+      matchPrefix: true,
+    })
+  }
+
+  if (features.submissions) {
+    result.push({
+      title: "Submissions",
+      href: "/submissions",
+      icon: InboxIcon,
+      matchPrefix: true,
+      badgeCount:
+        unreadSubmissionsCount > 0 ? unreadSubmissionsCount : undefined,
+    })
+  }
+
+  if (features.rentals) {
+    result.push({
+      title: "Rentals",
+      href: "/rentals",
+      icon: TruckIcon,
+      matchPrefix: true,
+    })
+  }
+
+  return result
 }
 
 function buildWorkspaceNav(
   features: ClientFeatures,
-  ordersEnabled: boolean
+  ordersEnabled: boolean,
+  unreadSubmissionsCount = 0
 ): NavEntry[] {
   const items: NavEntry[] = [
     { title: "Overview", href: "/dashboard", icon: DashboardSquare01Icon },
@@ -74,47 +121,28 @@ function buildWorkspaceNav(
     })
   }
 
-  if (features.blog) {
-    items.push({
-      title: "Articles",
-      href: "/articles",
-      icon: News01Icon,
-      matchPrefix: true,
-    })
-  }
+  return appendSharedFeatureNav(items, features, unreadSubmissionsCount)
+}
 
-  if (features.submissions) {
-    items.push({
-      title: "Submissions",
-      href: "/submissions",
-      icon: InboxIcon,
-      matchPrefix: true,
-    })
-  }
+function buildInsightsNav(
+  features: ClientFeatures,
+  ordersEnabled: boolean
+): NavEntry[] {
+  if (!features.analytics) return []
 
-  if (features.rentals) {
+  const items: NavEntry[] = [
+    { title: "Analytics", href: "/analytics", icon: ChartBarLineIcon },
+  ]
+
+  if (ordersEnabled) {
     items.push({
-      title: "Rentals",
-      href: "/rentals",
-      icon: TruckIcon,
-      matchPrefix: true,
+      title: "Sales overview",
+      href: "/sales-overview",
+      icon: DollarCircleIcon,
     })
   }
 
   return items
-}
-
-function buildInsightsNav(features: ClientFeatures): NavEntry[] {
-  if (!features.analytics) return []
-
-  return [
-    { title: "Analytics", href: "/analytics", icon: ChartBarLineIcon },
-    {
-      title: "Sales overview",
-      href: "/sales-overview",
-      icon: DollarCircleIcon,
-    },
-  ]
 }
 
 function buildEditorNav(features: ClientFeatures): NavEntry[] {
@@ -167,6 +195,11 @@ function NavGroup({
                   <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>
+              {item.badgeCount ? (
+                <SidebarMenuBadge className="bg-primary text-primary-foreground">
+                  {item.badgeCount > 99 ? "99+" : item.badgeCount}
+                </SidebarMenuBadge>
+              ) : null}
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
@@ -179,16 +212,80 @@ interface AppSidebarProps {
   clientName: string
   features: ClientFeatures
   ordersEnabled?: boolean
+  squareEnabled?: boolean
+  squareOrdersEnabled?: boolean
+  unreadSubmissionsCount?: number
+  activeClientId?: string
+  devClients?: ClientOption[]
+}
+
+function buildSquareNav(
+  squareEnabled: boolean,
+  squareOrdersEnabled: boolean
+): NavEntry[] {
+  if (!squareEnabled) return []
+  const items: NavEntry[] = []
+  if (squareOrdersEnabled) {
+    items.push({
+      title: "Sales Overview",
+      href: "/square/analytics",
+      icon: DollarCircleIcon,
+    })
+    items.push({
+      title: "Orders",
+      href: "/square/orders",
+      icon: ShoppingCart01Icon,
+      matchPrefix: true,
+    })
+  }
+  items.push(
+    {
+      title: "Products",
+      href: "/products",
+      icon: PackageIcon,
+      matchPrefix: true,
+    },
+    { title: "Categories", href: "/products/categories", icon: Folder01Icon },
+    {
+      title: "Discounts",
+      href: "/square/discounts",
+      icon: TicketIcon,
+      matchPrefix: true,
+    },
+    {
+      title: "Option templates",
+      href: "/square/options",
+      icon: CheckmarkSquare01Icon,
+      matchPrefix: true,
+    }
+  )
+  items.push({
+    title: "Settings",
+    href: "/square/settings",
+    icon: Settings01Icon,
+  })
+  return items
 }
 
 export function AppSidebar({
   clientName,
   features,
   ordersEnabled = false,
+  squareEnabled = false,
+  squareOrdersEnabled = false,
+  unreadSubmissionsCount = 0,
+  activeClientId = "",
+  devClients = [],
 }: AppSidebarProps) {
   const pathname = usePathname() ?? "/"
-  const workspaceNav = buildWorkspaceNav(features, ordersEnabled)
-  const insightsNav = buildInsightsNav(features)
+
+  // When catalog is Square, replace the default workspace nav with Square nav
+  const isSquare = features.catalog === "square"
+  const squareNav = buildSquareNav(squareEnabled, squareOrdersEnabled)
+  const workspaceNav = isSquare
+    ? appendSharedFeatureNav(squareNav, features, unreadSubmissionsCount)
+    : buildWorkspaceNav(features, ordersEnabled, unreadSubmissionsCount)
+  const insightsNav = isSquare ? [] : buildInsightsNav(features, ordersEnabled)
   const editorNav = buildEditorNav(features)
 
   return (
@@ -213,7 +310,13 @@ export function AppSidebar({
         <NavGroup label="Insights" items={insightsNav} pathname={pathname} />
         <NavGroup label="Site editor" items={editorNav} pathname={pathname} />
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="gap-2">
+        {process.env.NODE_ENV === "development" && devClients.length > 0 ? (
+          <DevInviteUserDialog
+            activeClientId={activeClientId}
+            clients={devClients}
+          />
+        ) : null}
         <UserMenu />
       </SidebarFooter>
       <SidebarRail />

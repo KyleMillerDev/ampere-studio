@@ -18,21 +18,26 @@ async function loadImageDimensions(
   })
 }
 
-async function uploadWithProgress(url: string, file: File): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open("PUT", url)
-    xhr.setRequestHeader("Content-Type", file.type)
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve()
-      else reject(new Error(`Upload failed with ${xhr.status}`))
-    })
-    xhr.addEventListener("error", () => reject(new Error("Upload failed")))
-    xhr.send(file)
-  })
+export async function uploadPendingImageFile(
+  imageId: string,
+  file: File
+): Promise<void> {
+  return uploadViaApi(imageId, file)
 }
 
-/** Upload a file to the media library via presigned S3 PUT + finalize. */
+async function uploadViaApi(imageId: string, file: File): Promise<void> {
+  const res = await fetch(`/api/images/${imageId}/upload`, {
+    method: "POST",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  })
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string }
+    throw new Error(err.error ?? `Upload failed with ${res.status}`)
+  }
+}
+
+/** Upload a file to the media library via server proxy + finalize. */
 export async function uploadStudioImage(
   file: File,
   alt?: string
@@ -56,12 +61,11 @@ export async function uploadStudioImage(
     throw new Error(err.error ?? `Presign failed with ${presignRes.status}`)
   }
 
-  const { image, uploadUrl } = (await presignRes.json()) as {
+  const { image } = (await presignRes.json()) as {
     image: StudioImage
-    uploadUrl: string
   }
 
-  await uploadWithProgress(uploadUrl, file)
+  await uploadViaApi(image.id, file)
 
   const finalizeRes = await fetch(`/api/images/${image.id}/finalize`, {
     method: "POST",
