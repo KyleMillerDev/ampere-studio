@@ -727,91 +727,12 @@ export function StripeSalesOverview() {
             </div>
           )}
 
-          {/* ── Revenue chart ── */}
+          {/* ── Revenue chart (Area) ── */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <CardTitle className="text-sm">Revenue</CardTitle>
-                  {compareEnabled && prevSummary && (
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1.5">
-                        <span
-                          className="inline-block size-2.5 rounded-full"
-                          style={{ background: COLOR_CURRENT }}
-                        />
-                        Current
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <span
-                          className="inline-block size-2.5 rounded-full"
-                          style={{ background: COLOR_PREV }}
-                        />
-                        Prior period
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <GranularityToggle />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {chartData.length === 0 ? (
-                <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-                  No revenue data for selected range.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart
-                    data={chartData}
-                    margin={{ top: 4, right: 8, bottom: 0, left: 8 }}
-                    barGap={2}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      className="stroke-border/50"
-                    />
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tickFormatter={fmtShort}
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      width={52}
-                    />
-                    <Tooltip content={<ChartTooltip isRevenue />} />
-                    {compareEnabled && prevSummary && (
-                      <Bar
-                        dataKey="previous"
-                        name="Prior period"
-                        fill={COLOR_PREV}
-                        fillOpacity={0.55}
-                        radius={[2, 2, 0, 0]}
-                      />
-                    )}
-                    <Bar
-                      dataKey="current"
-                      name="Current"
-                      fill={COLOR_CURRENT}
-                      fillOpacity={0.9}
-                      radius={[3, 3, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* ── Orders chart ── */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <CardTitle className="text-sm">Orders</CardTitle>
                   {compareEnabled && prevSummary && (
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
@@ -840,17 +761,17 @@ export function StripeSalesOverview() {
             <CardContent>
               {chartData.length === 0 ? (
                 <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-                  No order data for selected range.
+                  No revenue data for selected range.
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={220}>
+                <ResponsiveContainer width="100%" height={260}>
                   <AreaChart
                     data={chartData}
                     margin={{ top: 4, right: 8, bottom: 0, left: 8 }}
                   >
                     <defs>
                       <linearGradient
-                        id="stripeOrdGradCurr"
+                        id="stripeRevGradCurr"
                         x1="0"
                         y1="0"
                         x2="0"
@@ -868,7 +789,7 @@ export function StripeSalesOverview() {
                         />
                       </linearGradient>
                       <linearGradient
-                        id="stripeOrdGradPrev"
+                        id="stripeRevGradPrev"
                         x1="0"
                         y1="0"
                         x2="0"
@@ -896,6 +817,94 @@ export function StripeSalesOverview() {
                       tickLine={false}
                     />
                     <YAxis
+                      tickFormatter={fmtShort}
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={52}
+                    />
+                    <Tooltip content={<ChartTooltip isRevenue />} />
+                    {compareEnabled && prevSummary && (
+                      <Area
+                        type="monotone"
+                        dataKey="previous"
+                        name="Prior period"
+                        stroke={COLOR_PREV}
+                        strokeWidth={1.5}
+                        strokeOpacity={0.7}
+                        strokeDasharray="4 2"
+                        fill="url(#stripeRevGradPrev)"
+                        dot={false}
+                        activeDot={{ r: 3, strokeWidth: 0 }}
+                      />
+                    )}
+                    <Area
+                      type="monotone"
+                      dataKey="current"
+                      name="Current"
+                      stroke={COLOR_CURRENT}
+                      strokeWidth={2}
+                      strokeOpacity={1}
+                      fill="url(#stripeRevGradCurr)"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 0 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Orders chart ── */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <CardTitle className="text-sm">Orders</CardTitle>
+                  {compareEnabled && prevSummary && (
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block size-2.5 rounded-full"
+                          style={{ background: COLOR_CURRENT }}
+                        />
+                        Current
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block size-2.5 rounded-full"
+                          style={{ background: COLOR_PREV, opacity: 0.7 }}
+                        />
+                        Prior period
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <GranularityToggle />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {chartData.length === 0 ? (
+                <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+                  No order data for selected range.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart
+                    data={chartData}
+                    margin={{ top: 4, right: 8, bottom: 0, left: 8 }}
+                    barGap={2}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      className="stroke-border/50"
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                    />
+                    <YAxis
                       tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
@@ -903,31 +912,22 @@ export function StripeSalesOverview() {
                     />
                     <Tooltip content={<ChartTooltip isRevenue={false} />} />
                     {compareEnabled && prevSummary && (
-                      <Area
-                        type="monotone"
+                      <Bar
                         dataKey="ordPrevious"
                         name="Prior period"
-                        stroke={COLOR_PREV}
-                        strokeWidth={1.5}
-                        strokeOpacity={0.7}
-                        strokeDasharray="4 2"
-                        fill="url(#stripeOrdGradPrev)"
-                        dot={false}
-                        activeDot={{ r: 3, strokeWidth: 0 }}
+                        fill={COLOR_PREV}
+                        fillOpacity={0.55}
+                        radius={[2, 2, 0, 0]}
                       />
                     )}
-                    <Area
-                      type="monotone"
+                    <Bar
                       dataKey="ordCurrent"
                       name="Current"
-                      stroke={COLOR_CURRENT}
-                      strokeWidth={2}
-                      strokeOpacity={1}
-                      fill="url(#stripeOrdGradCurr)"
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 0 }}
+                      fill={COLOR_CURRENT}
+                      fillOpacity={0.9}
+                      radius={[3, 3, 0, 0]}
                     />
-                  </AreaChart>
+                  </BarChart>
                 </ResponsiveContainer>
               )}
             </CardContent>
