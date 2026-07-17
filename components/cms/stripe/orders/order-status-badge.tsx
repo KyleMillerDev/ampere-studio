@@ -12,6 +12,7 @@ const STATUS_VARIANT: Record<
   Complete: "default",
   Cancelled: "outline",
   Disputed: "destructive",
+  Failed: "destructive",
 }
 
 const STATUS_CLASS: Record<OrderStatus, string> = {
@@ -22,6 +23,8 @@ const STATUS_CLASS: Record<OrderStatus, string> = {
     "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300",
   Cancelled: "text-muted-foreground",
   Disputed:
+    "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300",
+  Failed:
     "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300",
 }
 

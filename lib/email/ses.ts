@@ -1,5 +1,7 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses"
 
+import { awsClientConfig } from "@/lib/aws/credentials"
+
 const SENDER_EMAIL =
   process.env.AMPERE_SES_SENDER_EMAIL ?? "noreply@amperecreativegroup.com"
 
@@ -9,7 +11,7 @@ let client: SESClient | null = null
 
 function getSes(): SESClient {
   if (!client) {
-    client = new SESClient({ region: SES_REGION })
+    client = new SESClient(awsClientConfig(SES_REGION))
   }
   return client
 }

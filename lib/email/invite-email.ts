@@ -66,17 +66,10 @@ export async function sendInviteEmail({
   })
 }
 
-export function resolveLoginUrl(request: Request): string {
+const DEFAULT_STUDIO_URL = "https://studio.amperesites.com"
+
+export function resolveLoginUrl(): string {
   const envUrl = process.env.AMPERE_STUDIO_URL?.trim()
-  if (envUrl) return `${envUrl.replace(/\/$/, "")}/login`
-
-  const origin = request.headers.get("origin")
-  if (origin) return `${origin}/login`
-
-  const host =
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host")
-  const proto = request.headers.get("x-forwarded-proto") ?? "http"
-  if (host) return `${proto}://${host}/login`
-
-  return "http://localhost:3000/login"
+  const base = envUrl ? envUrl.replace(/\/$/, "") : DEFAULT_STUDIO_URL
+  return `${base}/login`
 }

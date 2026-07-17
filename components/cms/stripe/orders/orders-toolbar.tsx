@@ -317,6 +317,7 @@ export function OrdersToolbar({
                 <SelectItem value="Complete">Complete</SelectItem>
                 <SelectItem value="Cancelled">Cancelled</SelectItem>
                 <SelectItem value="Disputed">Disputed</SelectItem>
+                <SelectItem value="Failed">Failed</SelectItem>
               </SelectContent>
             </Select>
           </div>

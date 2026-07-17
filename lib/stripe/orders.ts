@@ -18,6 +18,7 @@ export type OrderStatus =
   | "Complete"
   | "Cancelled"
   | "Disputed"
+  | "Failed"
 export type TrackingCarrier = "USPS" | "UPS" | "FEDEX" | "Other"
 export type StatusOverride = "shipped" | "complete" | "cancelled"
 
@@ -154,14 +155,64 @@ function isFullyRefunded(charge: Stripe.Charge | null): boolean {
   return charge.refunded === true
 }
 
+/** Resolve the latest_charge object (expanded or null). */
+function resolveCharge(pi: Stripe.PaymentIntent): Stripe.Charge | null {
+  if (!pi.latest_charge) return null
+  if (typeof pi.latest_charge === "string") return null
+  return pi.latest_charge as Stripe.Charge
+}
+
 /**
- * Derive the display status for a succeeded PaymentIntent.
- * Priority: Disputed > Cancelled > Complete > Shipped > Paid
+ * True when a PaymentIntent looks like an abandoned / unfinished checkout
+ * with no payment attempt outcome. Failed attempts are NOT incomplete.
+ */
+export function isIncompletePaymentIntent(pi: Stripe.PaymentIntent): boolean {
+  if (
+    pi.status === "succeeded" ||
+    pi.status === "canceled" ||
+    pi.status === "requires_capture"
+  ) {
+    return false
+  }
+
+  // Failed card/bank attempts leave an error (and often a failed charge).
+  if (pi.last_payment_error) return false
+  const charge = resolveCharge(pi)
+  if (charge?.status === "failed") return false
+
+  return (
+    pi.status === "requires_payment_method" ||
+    pi.status === "requires_confirmation" ||
+    pi.status === "requires_action" ||
+    pi.status === "processing"
+  )
+}
+
+function hasFailedPayment(
+  pi: Stripe.PaymentIntent,
+  charge: Stripe.Charge | null
+): boolean {
+  if (pi.last_payment_error) return true
+  return charge?.status === "failed"
+}
+
+/**
+ * Derive the display status for a PaymentIntent.
+ * Non-succeeded: Failed (attempted) or Cancelled.
+ * Succeeded priority: Disputed > Cancelled > Complete > Shipped > Paid
  */
 export function deriveOrderStatus(
   pi: Stripe.PaymentIntent,
   charge: Stripe.Charge | null
 ): OrderStatus {
+  if (pi.status !== "succeeded") {
+    if (hasFailedPayment(pi, charge)) return "Failed"
+    if (pi.status === "canceled") return "Cancelled"
+    // Authorized but not captured yet.
+    if (pi.status === "requires_capture") return "Paid"
+    return "Failed"
+  }
+
   if (hasActiveDispute(charge)) return "Disputed"
 
   const override = pi.metadata?.status_override as StatusOverride | undefined
@@ -190,13 +241,6 @@ export function carrierTrackingUrl(
     default:
       return null
   }
-}
-
-/** Resolve the latest_charge object (expanded or null). */
-function resolveCharge(pi: Stripe.PaymentIntent): Stripe.Charge | null {
-  if (!pi.latest_charge) return null
-  if (typeof pi.latest_charge === "string") return null
-  return pi.latest_charge as Stripe.Charge
 }
 
 function toOrderView(
@@ -271,7 +315,8 @@ export async function listStripeOrders(): Promise<OrderView[]> {
     limit: 100,
     expand: ["data.latest_charge"],
   })) {
-    if (pi.status !== "succeeded") continue
+    // Hide abandoned incomplete checkouts only; keep failed/canceled/etc.
+    if (isIncompletePaymentIntent(pi)) continue
     orders.push(toOrderView(pi, catalogMap))
   }
 
@@ -286,7 +331,7 @@ export async function getStripeOrder(id: string): Promise<OrderView | null> {
     const pi = await stripe.paymentIntents.retrieve(id, {
       expand: ["latest_charge"],
     })
-    if (pi.status !== "succeeded") return null
+    if (isIncompletePaymentIntent(pi)) return null
     return toOrderView(pi, catalogMap)
   } catch (err) {
     const e = err as { code?: string }

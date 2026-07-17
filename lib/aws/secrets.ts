@@ -6,6 +6,7 @@ import {
   ResourceExistsException,
 } from "@aws-sdk/client-secrets-manager"
 
+import { awsClientConfig } from "@/lib/aws/credentials"
 import { AWS_REGION } from "@/lib/cms/constants"
 import type { SquareOAuthTokens } from "@/lib/square/types"
 
@@ -13,7 +14,7 @@ import type { SquareOAuthTokens } from "@/lib/square/types"
 let client: SecretsManagerClient | null = null
 
 export function getSecretsManager(): SecretsManagerClient {
-  if (!client) client = new SecretsManagerClient({ region: AWS_REGION })
+  if (!client) client = new SecretsManagerClient(awsClientConfig(AWS_REGION))
   return client
 }
 

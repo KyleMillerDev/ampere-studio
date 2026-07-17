@@ -20,9 +20,12 @@ follow this contract exactly.
 ## 1. Orders are Stripe PaymentIntents
 
 - An order IS a `PaymentIntent`. There is no separate orders database.
-- **Only `succeeded` PaymentIntents are real orders.** Never display
-  `requires_payment_method`, `requires_confirmation`, `requires_action`,
-  `processing`, or `canceled` PIs on the orders list.
+- **Hide incomplete checkouts only.** Skip PIs still in
+  `requires_payment_method`, `requires_confirmation`, `requires_action`, or
+  `processing` when there was no payment attempt outcome.
+- **Do show** `succeeded`, `canceled`, `requires_capture`, and any PI with a
+  failed attempt (`last_payment_error` or a failed `latest_charge`). Failed
+  attempts display as status `Failed`.
 - Always expand `latest_charge` when fetching PIs for order data.
 
 ---
@@ -50,7 +53,7 @@ Every value comes from the `Ampere-Clients` DynamoDB record keyed by
 | `id`            | Order ID. Confirmation number = `id.slice(-12).toUpperCase()`                   |
 | `amount`        | Order TOTAL in cents (subtotal + shipping). Source of truth.                    |
 | `currency`      | Always `"usd"` for Cab Fresh; use as-is for display.                            |
-| `status`        | Must be `"succeeded"` to be a real order.                                       |
+| `status`        | Incomplete (no attempt) are hidden; failed/canceled/succeeded are listed.       |
 | `created`       | Unix seconds; order placed date.                                                |
 | `receipt_email` | Primary customer email. Fallback: `charge.billing_details.email`.               |
 | `shipping`      | `{ name, phone, address: { line1, line2, city, state, postal_code, country } }` |
@@ -105,6 +108,12 @@ await stripe.paymentIntents.update(id, {
 ---
 
 ## 6. Derived order status (badge) — priority order
+
+For non-succeeded PaymentIntents:
+
+1. **Failed** — `last_payment_error` is set, or `latest_charge.status === "failed"`.
+2. **Cancelled** — PI `status === "canceled"` without a failed attempt.
+3. **Paid** — PI `status === "requires_capture"` (authorized, not yet captured).
 
 Given a `succeeded` PaymentIntent, compute the display status:
 

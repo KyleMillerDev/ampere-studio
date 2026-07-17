@@ -7,13 +7,14 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider"
 
 import { COGNITO_CLIENT_ID_ATTRIBUTE } from "@/lib/auth/constants"
+import { awsClientConfig } from "@/lib/aws/credentials"
 import { AWS_REGION } from "@/lib/cms/constants"
 
 let client: CognitoIdentityProviderClient | null = null
 
 function getCognitoAdmin(): CognitoIdentityProviderClient {
   if (!client) {
-    client = new CognitoIdentityProviderClient({ region: AWS_REGION })
+    client = new CognitoIdentityProviderClient(awsClientConfig(AWS_REGION))
   }
   return client
 }

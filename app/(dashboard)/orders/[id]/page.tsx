@@ -155,7 +155,8 @@ export default async function OrderDetailPage({ params }: Ctx) {
                       order.status === s
                         ? "border-primary bg-primary/10 font-medium text-primary"
                         : order.status === "Cancelled" ||
-                            order.status === "Disputed"
+                            order.status === "Disputed" ||
+                            order.status === "Failed"
                           ? "opacity-40"
                           : "text-muted-foreground"
                     }`}
@@ -164,7 +165,8 @@ export default async function OrderDetailPage({ params }: Ctx) {
                   </div>
                 ))}
                 {(order.status === "Cancelled" ||
-                  order.status === "Disputed") && (
+                  order.status === "Disputed" ||
+                  order.status === "Failed") && (
                   <div className="flex items-center gap-2 rounded-full border border-destructive/50 bg-destructive/10 px-3 py-1 text-sm font-medium text-destructive">
                     {order.status}
                   </div>

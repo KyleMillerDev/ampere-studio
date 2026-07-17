@@ -6,12 +6,13 @@ import {
   ListObjectsV2Command,
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { awsClientConfig } from "@/lib/aws/credentials"
 import { AWS_REGION, IMAGES_BUCKET, PUBLIC_BUCKET } from "@/lib/cms/constants"
 
 let client: S3Client | null = null
 
 export function getS3(): S3Client {
-  if (!client) client = new S3Client({ region: AWS_REGION })
+  if (!client) client = new S3Client(awsClientConfig(AWS_REGION))
   return client
 }
 

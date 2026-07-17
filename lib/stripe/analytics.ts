@@ -51,6 +51,7 @@ export interface StripeDashboardSummary {
     Complete: number
     Cancelled: number
     Disputed: number
+    Failed: number
   }
 
   orders_by_day: { date: string; count: number }[]
@@ -184,6 +185,7 @@ export async function computeStripeDashboardSummary(
     Complete: filtered.filter((o) => o.status === "Complete").length,
     Cancelled: filtered.filter((o) => o.status === "Cancelled").length,
     Disputed: filtered.filter((o) => o.status === "Disputed").length,
+    Failed: filtered.filter((o) => o.status === "Failed").length,
   }
 
   // Time-series aggregation.

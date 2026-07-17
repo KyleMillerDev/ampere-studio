@@ -65,6 +65,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   Paid: "oklch(72% 0.14 85)",
   Cancelled: "oklch(55% 0.18 25)",
   Disputed: "oklch(58% 0.20 15)",
+  Failed: "oklch(58% 0.20 15)",
 }
 
 const STATUS_BADGE: Record<
@@ -76,6 +77,7 @@ const STATUS_BADGE: Record<
   Paid: "outline",
   Cancelled: "destructive",
   Disputed: "destructive",
+  Failed: "destructive",
 }
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
@@ -619,6 +621,7 @@ export function StripeSalesOverview() {
             <SelectItem value="Complete">Complete</SelectItem>
             <SelectItem value="Cancelled">Cancelled</SelectItem>
             <SelectItem value="Disputed">Disputed</SelectItem>
+            <SelectItem value="Failed">Failed</SelectItem>
           </SelectContent>
         </Select>
 

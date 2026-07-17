@@ -194,37 +194,45 @@ export function OrderActions({ order }: OrderActionsProps) {
           <DropdownMenuItem asChild>
             <Link href={`/orders/${order.id}`}>View Order</Link>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setOpen("tracking")}>
-            Add Tracking
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href={`/orders/${order.id}/edit`}>Edit Order</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setOpen("receipt")}>
-            Send receipt
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setOpen("status")}>
-            Change Status
-          </DropdownMenuItem>
+          {order.status !== "Failed" && (
+            <>
+              <DropdownMenuItem onSelect={() => setOpen("tracking")}>
+                Add Tracking
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/orders/${order.id}/edit`}>Edit Order</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setOpen("receipt")}>
+                Send receipt
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setOpen("status")}>
+                Change Status
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuItem asChild>
             <a href={`mailto:${order.customerEmail ?? ""}`}>Email Customer</a>
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <div className="px-2 py-1 text-xs font-semibold text-destructive">
-            Danger Zone
-          </div>
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onSelect={() => setOpen("refund")}
-          >
-            Refund Order
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onSelect={() => setOpen("cancel")}
-          >
-            Cancel Order
-          </DropdownMenuItem>
+          {order.status !== "Failed" && (
+            <>
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1 text-xs font-semibold text-destructive">
+                Danger Zone
+              </div>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={() => setOpen("refund")}
+              >
+                Refund Order
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={() => setOpen("cancel")}
+              >
+                Cancel Order
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

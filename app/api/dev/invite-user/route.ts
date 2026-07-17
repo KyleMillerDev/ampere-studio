@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     await sendInviteEmail({
       to: invite.email,
       temporaryPassword: invite.temporaryPassword,
-      loginUrl: resolveLoginUrl(req),
+      loginUrl: resolveLoginUrl(),
       clientName: client.name,
     })
 
