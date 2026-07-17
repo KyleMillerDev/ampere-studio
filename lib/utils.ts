@@ -81,6 +81,18 @@ export function formatUnixDate(seconds: number | undefined): string {
   })
 }
 
+/** Format a unix-seconds timestamp with a short date and time. */
+export function formatUnixDateTime(seconds: number | undefined): string {
+  if (!seconds) return "—"
+  return new Date(seconds * 1000).toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
 /** Format an ISO date string as a short, human-friendly date. */
 export function formatDate(iso: string | undefined): string {
   if (!iso) return "—"

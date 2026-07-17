@@ -315,6 +315,10 @@ export function OrdersToolbar({
                 <SelectItem value="Paid">Paid</SelectItem>
                 <SelectItem value="Shipped">Shipped</SelectItem>
                 <SelectItem value="Complete">Complete</SelectItem>
+                <SelectItem value="Partially Refunded">
+                  Partially Refunded
+                </SelectItem>
+                <SelectItem value="Refunded">Refunded</SelectItem>
                 <SelectItem value="Cancelled">Cancelled</SelectItem>
                 <SelectItem value="Disputed">Disputed</SelectItem>
                 <SelectItem value="Failed">Failed</SelectItem>

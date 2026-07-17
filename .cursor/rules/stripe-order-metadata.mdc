@@ -118,13 +118,21 @@ For non-succeeded PaymentIntents:
 Given a `succeeded` PaymentIntent, compute the display status:
 
 1. **Disputed** — `latest_charge` has an active dispute (not `won` or `lost`).
-2. **Cancelled** — `metadata.status_override === "cancelled"` OR charge is fully refunded.
-3. **Complete** — `metadata.status_override === "complete"`.
-4. **Shipped** — `metadata.status_override === "shipped"` OR `metadata.tracking` is non-empty.
-5. **Paid** — default fallback.
+2. **Refunded** — charge is fully refunded (`charge.refunded === true`).
+3. **Cancelled** — `metadata.status_override === "cancelled"`.
+4. **Partially Refunded** — `charge.amount_refunded > 0` and not fully refunded.
+5. **Complete** — `metadata.status_override === "complete"`.
+6. **Shipped** — `metadata.status_override === "shipped"` OR `metadata.tracking` is non-empty.
+7. **Paid** — default fallback.
 
-`status_override` always wins over tracking-based inference. Set it explicitly
-via the "Change Status" action (writes to `metadata.status_override`).
+Always expand `latest_charge` and `latest_charge.refunds` when reading orders so
+refund timestamps and per-refund amounts are available. `OrderView` exposes
+`refundedAmount`, `netAmount` (original minus refunded), `isRefunded`,
+`isPartiallyRefunded`, and `refunds[]`.
+
+`status_override` wins over tracking-based inference, but full/partial refund
+state takes priority over fulfillment statuses. Set override explicitly via
+the "Change Status" action (writes to `metadata.status_override`).
 
 ---
 

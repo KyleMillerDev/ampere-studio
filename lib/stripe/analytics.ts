@@ -49,6 +49,8 @@ export interface StripeDashboardSummary {
     Paid: number
     Shipped: number
     Complete: number
+    "Partially Refunded": number
+    Refunded: number
     Cancelled: number
     Disputed: number
     Failed: number
@@ -168,9 +170,13 @@ export async function computeStripeDashboardSummary(
     return true
   })
 
-  // Revenue: count non-cancelled and non-disputed orders.
+  // Revenue: exclude cancelled, disputed, fully refunded, and failed orders.
   const activeOrders = filtered.filter(
-    (o) => o.status !== "Cancelled" && o.status !== "Disputed"
+    (o) =>
+      o.status !== "Cancelled" &&
+      o.status !== "Disputed" &&
+      o.status !== "Refunded" &&
+      o.status !== "Failed"
   )
   const totalRevenue = activeOrders.reduce((s, o) => s + o.pi.amount, 0)
   const totalRefunded = filtered.reduce((s, o) => s + o.refundedAmount, 0)
@@ -183,6 +189,10 @@ export async function computeStripeDashboardSummary(
     Paid: filtered.filter((o) => o.status === "Paid").length,
     Shipped: filtered.filter((o) => o.status === "Shipped").length,
     Complete: filtered.filter((o) => o.status === "Complete").length,
+    "Partially Refunded": filtered.filter(
+      (o) => o.status === "Partially Refunded"
+    ).length,
+    Refunded: filtered.filter((o) => o.status === "Refunded").length,
     Cancelled: filtered.filter((o) => o.status === "Cancelled").length,
     Disputed: filtered.filter((o) => o.status === "Disputed").length,
     Failed: filtered.filter((o) => o.status === "Failed").length,
@@ -201,7 +211,12 @@ export async function computeStripeDashboardSummary(
     const week = toIsoWeek(o.pi.created)
     const month = toIsoMonth(o.pi.created)
     const rev =
-      o.status !== "Cancelled" && o.status !== "Disputed" ? o.pi.amount : 0
+      o.status !== "Cancelled" &&
+      o.status !== "Disputed" &&
+      o.status !== "Refunded" &&
+      o.status !== "Failed"
+        ? o.pi.amount
+        : 0
 
     revByDay.set(day, (revByDay.get(day) ?? 0) + rev)
     revByWeek.set(week, (revByWeek.get(week) ?? 0) + rev)

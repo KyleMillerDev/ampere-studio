@@ -17,6 +17,8 @@ export type OrderStatus =
   | "Shipped"
   | "Complete"
   | "Cancelled"
+  | "Refunded"
+  | "Partially Refunded"
   | "Disputed"
   | "Failed"
 export type TrackingCarrier = "USPS" | "UPS" | "FEDEX" | "Other"
@@ -38,6 +40,14 @@ export interface EnrichedLineItem {
   lineTotal: number | null
 }
 
+export interface OrderRefund {
+  id: string
+  amount: number
+  created: number
+  status: string
+  reason: string | null
+}
+
 export interface OrderView {
   id: string
   confirmationNumber: string
@@ -57,8 +67,28 @@ export interface OrderView {
   statusOverride: StatusOverride | null
   rawMetadata: Record<string, string>
   hasDispute: boolean
+  /** True when the charge is fully refunded. */
   isRefunded: boolean
+  /** True when some (but not all) of the charge has been refunded. */
+  isPartiallyRefunded: boolean
+  /** Total refunded in cents (sum of all refunds). */
   refundedAmount: number
+  /** Net amount retained after refunds (cents). */
+  netAmount: number
+  /** Individual Stripe refunds, newest first when available. */
+  refunds: OrderRefund[]
+}
+
+/** Expand paths for PaymentIntent order reads. */
+const ORDER_EXPAND = ["latest_charge", "latest_charge.refunds"] as const
+const ORDER_LIST_EXPAND = [
+  "data.latest_charge",
+  "data.latest_charge.refunds",
+] as const
+
+/** Net amount kept after refunds (never negative). */
+export function orderNetAmount(amount: number, refundedAmount: number): number {
+  return Math.max(0, amount - refundedAmount)
 }
 
 // ---------------------------------------------------------------------------
@@ -155,11 +185,33 @@ function isFullyRefunded(charge: Stripe.Charge | null): boolean {
   return charge.refunded === true
 }
 
+/** Returns true when a charge has a partial (non-zero, non-full) refund. */
+function isPartiallyRefundedCharge(charge: Stripe.Charge | null): boolean {
+  if (!charge) return false
+  const refunded = charge.amount_refunded ?? 0
+  return refunded > 0 && charge.refunded !== true
+}
+
 /** Resolve the latest_charge object (expanded or null). */
 function resolveCharge(pi: Stripe.PaymentIntent): Stripe.Charge | null {
   if (!pi.latest_charge) return null
   if (typeof pi.latest_charge === "string") return null
   return pi.latest_charge as Stripe.Charge
+}
+
+/** Map expanded charge.refunds into OrderRefund records. */
+function extractRefunds(charge: Stripe.Charge | null): OrderRefund[] {
+  const data = charge?.refunds?.data
+  if (!data?.length) return []
+  return [...data]
+    .map((r) => ({
+      id: r.id,
+      amount: r.amount,
+      created: r.created,
+      status: r.status ?? "unknown",
+      reason: r.reason ?? null,
+    }))
+    .sort((a, b) => b.created - a.created)
 }
 
 /**
@@ -199,7 +251,8 @@ function hasFailedPayment(
 /**
  * Derive the display status for a PaymentIntent.
  * Non-succeeded: Failed (attempted) or Cancelled.
- * Succeeded priority: Disputed > Cancelled > Complete > Shipped > Paid
+ * Succeeded priority:
+ *   Disputed > Refunded > Cancelled > Partially Refunded > Complete > Shipped > Paid
  */
 export function deriveOrderStatus(
   pi: Stripe.PaymentIntent,
@@ -215,9 +268,12 @@ export function deriveOrderStatus(
 
   if (hasActiveDispute(charge)) return "Disputed"
 
+  if (isFullyRefunded(charge)) return "Refunded"
+
   const override = pi.metadata?.status_override as StatusOverride | undefined
 
-  if (override === "cancelled" || isFullyRefunded(charge)) return "Cancelled"
+  if (override === "cancelled") return "Cancelled"
+  if (isPartiallyRefundedCharge(charge)) return "Partially Refunded"
   if (override === "complete") return "Complete"
   if (override === "shipped" || (pi.metadata?.tracking ?? "").length > 0)
     return "Shipped"
@@ -271,6 +327,8 @@ function toOrderView(
   const shippingCost = shippingCostStr ? parseInt(shippingCostStr, 10) : null
 
   const refundedAmount = charge?.amount_refunded ?? 0
+  const fullyRefunded = isFullyRefunded(charge)
+  const partiallyRefunded = isPartiallyRefundedCharge(charge)
 
   return {
     id: pi.id,
@@ -291,8 +349,11 @@ function toOrderView(
     statusOverride: (pi.metadata?.status_override as StatusOverride) ?? null,
     rawMetadata: { ...pi.metadata } as Record<string, string>,
     hasDispute: hasActiveDispute(charge),
-    isRefunded: isFullyRefunded(charge),
+    isRefunded: fullyRefunded,
+    isPartiallyRefunded: partiallyRefunded,
     refundedAmount,
+    netAmount: orderNetAmount(pi.amount, refundedAmount),
+    refunds: extractRefunds(charge),
   }
 }
 
@@ -313,7 +374,7 @@ export async function listStripeOrders(): Promise<OrderView[]> {
 
   for await (const pi of stripe.paymentIntents.list({
     limit: 100,
-    expand: ["data.latest_charge"],
+    expand: [...ORDER_LIST_EXPAND],
   })) {
     // Hide abandoned incomplete checkouts only; keep failed/canceled/etc.
     if (isIncompletePaymentIntent(pi)) continue
@@ -329,7 +390,7 @@ export async function getStripeOrder(id: string): Promise<OrderView | null> {
 
   try {
     const pi = await stripe.paymentIntents.retrieve(id, {
-      expand: ["latest_charge"],
+      expand: [...ORDER_EXPAND],
     })
     if (isIncompletePaymentIntent(pi)) return null
     return toOrderView(pi, catalogMap)

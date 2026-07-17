@@ -3,8 +3,13 @@ import Link from "next/link"
 
 import { isStripeOrdersEnabled } from "@/lib/stripe/config"
 import { getStripeOrder, carrierTrackingUrl } from "@/lib/stripe/orders"
-import { formatStripeAmount, formatUnixDate } from "@/lib/utils"
+import {
+  formatStripeAmount,
+  formatUnixDate,
+  formatUnixDateTime,
+} from "@/lib/utils"
 import { OrderStatusBadge } from "@/components/cms/stripe/orders/order-status-badge"
+import { OrderAmount } from "@/components/cms/stripe/orders/order-amount"
 import { OrderActions } from "@/components/cms/stripe/orders/order-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +20,20 @@ import { Image01Icon, ArrowLeft01Icon } from "@hugeicons/core-free-icons"
 export const dynamic = "force-dynamic"
 
 type Ctx = { params: Promise<{ id: string }> }
+
+function refundReasonLabel(reason: string | null): string | null {
+  if (!reason) return null
+  switch (reason) {
+    case "duplicate":
+      return "Duplicate"
+    case "fraudulent":
+      return "Fraudulent"
+    case "requested_by_customer":
+      return "Requested by customer"
+    default:
+      return reason.replace(/_/g, " ")
+  }
+}
 
 export default async function OrderDetailPage({ params }: Ctx) {
   const enabled = await isStripeOrdersEnabled()
@@ -38,6 +57,13 @@ export default async function OrderDetailPage({ params }: Ctx) {
         addr.country,
       ].filter(Boolean)
     : []
+
+  const hasRefund = order.refundedAmount > 0
+  const refundLabel = order.isRefunded
+    ? "Fully refunded"
+    : order.isPartiallyRefunded
+      ? "Partially refunded"
+      : null
 
   return (
     <div className="space-y-6">
@@ -133,10 +159,35 @@ export default async function OrderDetailPage({ params }: Ctx) {
                 </div>
                 <div className="flex justify-between text-base font-semibold">
                   <span>Total</span>
-                  <span>
-                    {formatStripeAmount(order.amount, order.currency)}
-                  </span>
+                  <OrderAmount
+                    amount={order.amount}
+                    refundedAmount={order.refundedAmount}
+                    currency={order.currency}
+                    className="items-end text-base"
+                    netClassName="font-semibold"
+                    originalClassName="text-sm"
+                  />
                 </div>
+                {hasRefund && (
+                  <>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Refunded</span>
+                      <span>
+                        −
+                        {formatStripeAmount(
+                          order.refundedAmount,
+                          order.currency
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                      <span>Net</span>
+                      <span>
+                        {formatStripeAmount(order.netAmount, order.currency)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -155,6 +206,8 @@ export default async function OrderDetailPage({ params }: Ctx) {
                       order.status === s
                         ? "border-primary bg-primary/10 font-medium text-primary"
                         : order.status === "Cancelled" ||
+                            order.status === "Refunded" ||
+                            order.status === "Partially Refunded" ||
                             order.status === "Disputed" ||
                             order.status === "Failed"
                           ? "opacity-40"
@@ -165,9 +218,19 @@ export default async function OrderDetailPage({ params }: Ctx) {
                   </div>
                 ))}
                 {(order.status === "Cancelled" ||
+                  order.status === "Refunded" ||
+                  order.status === "Partially Refunded" ||
                   order.status === "Disputed" ||
                   order.status === "Failed") && (
-                  <div className="flex items-center gap-2 rounded-full border border-destructive/50 bg-destructive/10 px-3 py-1 text-sm font-medium text-destructive">
+                  <div
+                    className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium ${
+                      order.status === "Partially Refunded"
+                        ? "border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300"
+                        : order.status === "Refunded"
+                          ? "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300"
+                          : "border-destructive/50 bg-destructive/10 text-destructive"
+                    }`}
+                  >
                     {order.status}
                   </div>
                 )}
@@ -264,6 +327,73 @@ export default async function OrderDetailPage({ params }: Ctx) {
               )}
             </CardContent>
           </Card>
+
+          {/* Refunds */}
+          {hasRefund && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Refunds</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="space-y-1">
+                  {refundLabel && <p className="font-medium">{refundLabel}</p>}
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Original total</span>
+                    <span>
+                      {formatStripeAmount(order.amount, order.currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Total refunded</span>
+                    <span>
+                      {formatStripeAmount(order.refundedAmount, order.currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>Net kept</span>
+                    <span>
+                      {formatStripeAmount(order.netAmount, order.currency)}
+                    </span>
+                  </div>
+                </div>
+
+                {order.refunds.length > 0 ? (
+                  <>
+                    <Separator />
+                    <ul className="space-y-3">
+                      {order.refunds.map((refund) => {
+                        const reason = refundReasonLabel(refund.reason)
+                        return (
+                          <li key={refund.id} className="space-y-0.5">
+                            <div className="flex justify-between gap-3">
+                              <span className="font-medium">
+                                {formatStripeAmount(
+                                  refund.amount,
+                                  order.currency
+                                )}
+                              </span>
+                              <span className="text-muted-foreground capitalize">
+                                {refund.status}
+                              </span>
+                            </div>
+                            <p className="text-muted-foreground">
+                              {formatUnixDateTime(refund.created)}
+                              {reason ? ` · ${reason}` : ""}
+                            </p>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">
+                    Refund recorded on the charge. Individual refund details
+                    were not available.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick actions */}
           <Card>

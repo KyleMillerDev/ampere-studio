@@ -11,6 +11,8 @@ const STATUS_VARIANT: Record<
   Shipped: "default",
   Complete: "default",
   Cancelled: "outline",
+  Refunded: "outline",
+  "Partially Refunded": "outline",
   Disputed: "destructive",
   Failed: "destructive",
 }
@@ -22,6 +24,10 @@ const STATUS_CLASS: Record<OrderStatus, string> = {
   Complete:
     "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300",
   Cancelled: "text-muted-foreground",
+  Refunded:
+    "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300",
+  "Partially Refunded":
+    "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300",
   Disputed:
     "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300",
   Failed:

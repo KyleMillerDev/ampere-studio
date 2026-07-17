@@ -64,6 +64,8 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   Shipped: "oklch(68% 0.16 220)",
   Paid: "oklch(72% 0.14 85)",
   Cancelled: "oklch(55% 0.18 25)",
+  Refunded: "oklch(55% 0.02 260)",
+  "Partially Refunded": "oklch(68% 0.14 55)",
   Disputed: "oklch(58% 0.20 15)",
   Failed: "oklch(58% 0.20 15)",
 }
@@ -76,6 +78,8 @@ const STATUS_BADGE: Record<
   Shipped: "secondary",
   Paid: "outline",
   Cancelled: "destructive",
+  Refunded: "outline",
+  "Partially Refunded": "secondary",
   Disputed: "destructive",
   Failed: "destructive",
 }
@@ -619,6 +623,10 @@ export function StripeSalesOverview() {
             <SelectItem value="Paid">Paid</SelectItem>
             <SelectItem value="Shipped">Shipped</SelectItem>
             <SelectItem value="Complete">Complete</SelectItem>
+            <SelectItem value="Partially Refunded">
+              Partially Refunded
+            </SelectItem>
+            <SelectItem value="Refunded">Refunded</SelectItem>
             <SelectItem value="Cancelled">Cancelled</SelectItem>
             <SelectItem value="Disputed">Disputed</SelectItem>
             <SelectItem value="Failed">Failed</SelectItem>

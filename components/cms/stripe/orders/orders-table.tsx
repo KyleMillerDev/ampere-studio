@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { OrderStatusBadge } from "@/components/cms/stripe/orders/order-status-badge"
+import { OrderAmount } from "@/components/cms/stripe/orders/order-amount"
 import { OrderActions } from "@/components/cms/stripe/orders/order-actions"
 import {
   OrdersToolbar,
@@ -64,8 +65,9 @@ function matchesFilters(order: OrderView, filters: OrderFilters): boolean {
   if (filters.hasDispute === true && !order.hasDispute) return false
   if (filters.hasDispute === false && order.hasDispute) return false
 
-  if (filters.isRefunded === true && !order.isRefunded) return false
-  if (filters.isRefunded === false && order.isRefunded) return false
+  const hasRefund = order.refundedAmount > 0
+  if (filters.isRefunded === true && !hasRefund) return false
+  if (filters.isRefunded === false && hasRefund) return false
 
   return true
 }
@@ -181,8 +183,21 @@ function ExpandedRow({ order }: { order: OrderView }) {
               </div>
               <div className="flex justify-between font-semibold">
                 <span>Total</span>
-                <span>{formatStripeAmount(order.amount, order.currency)}</span>
+                <OrderAmount
+                  amount={order.amount}
+                  refundedAmount={order.refundedAmount}
+                  currency={order.currency}
+                  className="items-end"
+                />
               </div>
+              {order.refundedAmount > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Refunded</span>
+                  <span>
+                    −{formatStripeAmount(order.refundedAmount, order.currency)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -316,7 +331,11 @@ export function OrdersTable({ orders, catalogProducts }: OrdersTableProps) {
                         {itemSummary(order)}
                       </TableCell>
                       <TableCell className="text-sm font-medium">
-                        {formatStripeAmount(order.amount, order.currency)}
+                        <OrderAmount
+                          amount={order.amount}
+                          refundedAmount={order.refundedAmount}
+                          currency={order.currency}
+                        />
                       </TableCell>
                       <TableCell>
                         <OrderStatusBadge status={order.status} />
