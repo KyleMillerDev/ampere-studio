@@ -16,6 +16,8 @@ import { countUnreadSubmissions } from "@/lib/cms/submissions"
 import { isStripeOrdersEnabled } from "@/lib/stripe/config"
 import { isSquareEnabled, isSquareOrdersEnabled } from "@/lib/square/config"
 
+export const dynamic = "force-dynamic"
+
 export default async function DashboardLayout({
   children,
 }: {
