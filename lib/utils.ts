@@ -22,6 +22,10 @@ export function formatPhone(phone: string): string {
   if (digits.length === 10) {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
   }
+  // US/Canada with leading country code
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
+  }
   return phone
 }
 
@@ -93,6 +97,32 @@ export function formatUnixDateTime(seconds: number | undefined): string {
   })
 }
 
+/**
+ * Format unix seconds in the viewer's local timezone, e.g.
+ * "Wed September 15, 2026, 11:00pm CST".
+ */
+export function formatLocalFriendlyDateTime(
+  seconds: number | undefined
+): string {
+  if (!seconds) return "—"
+  const d = new Date(seconds * 1000)
+  const weekday = d.toLocaleDateString("en-US", { weekday: "short" })
+  const date = d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  })
+  const time = d
+    .toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZoneName: "short",
+    })
+    .replace(/\s*(AM|PM)/i, (_, mer: string) => mer.toLowerCase())
+  return `${weekday} ${date}, ${time}`
+}
+
 /** Format an ISO date string as a short, human-friendly date. */
 export function formatDate(iso: string | undefined): string {
   if (!iso) return "—"
@@ -103,4 +133,58 @@ export function formatDate(iso: string | undefined): string {
     month: "short",
     day: "numeric",
   })
+}
+
+/**
+ * Relative timestamp for recent activity lists, e.g.
+ * "12 minutes ago", "3 hours ago", "Yesterday", "1 day ago", "Last week".
+ */
+export function formatRelativeTime(
+  iso: string | undefined,
+  now: Date = new Date()
+): string {
+  if (!iso) return "—"
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return "—"
+
+  const diffMs = now.getTime() - date.getTime()
+  if (diffMs < 0) return "Just now"
+
+  const minutes = Math.floor(diffMs / 60_000)
+  if (minutes < 1) return "Just now"
+  if (minutes < 60) {
+    return minutes === 1 ? "1 minute ago" : `${minutes} minutes ago`
+  }
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) {
+    return hours === 1 ? "1 hour ago" : `${hours} hours ago`
+  }
+
+  const startOfToday = new Date(now)
+  startOfToday.setHours(0, 0, 0, 0)
+  const startOfYesterday = new Date(startOfToday)
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1)
+
+  if (date >= startOfYesterday && date < startOfToday) {
+    return "Yesterday"
+  }
+
+  const days = Math.floor(hours / 24)
+  if (days === 1) return "1 day ago"
+  if (days < 7) return `${days} days ago`
+  if (days < 14) return "Last week"
+
+  const weeks = Math.floor(days / 7)
+  if (weeks < 5) {
+    return weeks === 1 ? "Last week" : `${weeks} weeks ago`
+  }
+
+  const months = Math.floor(days / 30)
+  if (months < 12) {
+    return months <= 1 ? "Last month" : `${months} months ago`
+  }
+
+  const years = Math.floor(days / 365)
+  return years <= 1 ? "Last year" : `${years} years ago`
 }

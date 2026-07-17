@@ -19,6 +19,7 @@ import {
   TicketIcon,
   Settings01Icon,
   CheckmarkSquare01Icon,
+  BankIcon,
 } from "@hugeicons/core-free-icons"
 
 import {
@@ -33,7 +34,6 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from "@/components/ui/sidebar"
 import { DevInviteUserDialog } from "@/components/cms/dev-invite-user-dialog"
 import { UserMenu } from "@/components/cms/user-menu"
@@ -97,52 +97,46 @@ function buildWorkspaceNav(
   ]
 
   if (features.catalog) {
-    items.push(
-      {
-        title: "Products",
-        href: "/products",
-        icon: PackageIcon,
-        matchPrefix: true,
-      },
-      {
+    items.push({
+      title: "Products",
+      href: "/products",
+      icon: PackageIcon,
+      matchPrefix: true,
+    })
+    // Stripe catalog has no categories UI yet; hide the nav item for now.
+    if (features.catalog !== "stripe") {
+      items.push({
         title: "Categories",
         href: "/products/categories",
         icon: Folder01Icon,
-      }
-    )
+      })
+    }
   }
 
   if (ordersEnabled) {
-    items.push({
-      title: "Orders",
-      href: "/orders",
-      icon: ShoppingCart01Icon,
-      matchPrefix: true,
-    })
+    items.push(
+      {
+        title: "Orders",
+        href: "/orders",
+        icon: ShoppingCart01Icon,
+        matchPrefix: true,
+      },
+      {
+        title: "Balances",
+        href: "/balances",
+        icon: BankIcon,
+        matchPrefix: true,
+      }
+    )
   }
 
   return appendSharedFeatureNav(items, features, unreadSubmissionsCount)
 }
 
-function buildInsightsNav(
-  features: ClientFeatures,
-  ordersEnabled: boolean
-): NavEntry[] {
+function buildInsightsNav(features: ClientFeatures): NavEntry[] {
   if (!features.analytics) return []
 
-  const items: NavEntry[] = [
-    { title: "Analytics", href: "/analytics", icon: ChartBarLineIcon },
-  ]
-
-  if (ordersEnabled) {
-    items.push({
-      title: "Sales overview",
-      href: "/sales-overview",
-      icon: DollarCircleIcon,
-    })
-  }
-
-  return items
+  return [{ title: "Analytics", href: "/analytics", icon: ChartBarLineIcon }]
 }
 
 function buildEditorNav(features: ClientFeatures): NavEntry[] {
@@ -285,11 +279,11 @@ export function AppSidebar({
   const workspaceNav = isSquare
     ? appendSharedFeatureNav(squareNav, features, unreadSubmissionsCount)
     : buildWorkspaceNav(features, ordersEnabled, unreadSubmissionsCount)
-  const insightsNav = isSquare ? [] : buildInsightsNav(features, ordersEnabled)
+  const insightsNav = isSquare ? [] : buildInsightsNav(features)
   const editorNav = buildEditorNav(features)
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="none">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-2">
           <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -319,7 +313,6 @@ export function AppSidebar({
         ) : null}
         <UserMenu />
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   )
 }

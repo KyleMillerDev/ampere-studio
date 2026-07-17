@@ -5,8 +5,8 @@ import Link from "next/link"
 import { motion } from "motion/react"
 import {
   Home03Icon,
-  Image01Icon,
   Mail01Icon,
+  PackageIcon,
   ShoppingCart01Icon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -44,21 +44,21 @@ const defaultNavItems: NavItem[] = [
     href: "/products",
     icon: (
       <HugeiconsIcon
-        icon={ShoppingCart01Icon}
+        icon={PackageIcon}
         className="size-8 text-teal-500 md:h-12 md:w-12"
       />
     ),
     label: "Products",
   },
   {
-    href: "/content",
+    href: "/orders",
     icon: (
       <HugeiconsIcon
-        icon={Image01Icon}
+        icon={ShoppingCart01Icon}
         className="size-8 text-purple-500 md:h-12 md:w-12"
       />
     ),
-    label: "Content",
+    label: "Orders",
   },
   {
     href: "/submissions",

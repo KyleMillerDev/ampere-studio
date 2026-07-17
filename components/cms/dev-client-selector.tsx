@@ -63,7 +63,7 @@ export function DevClientSelector({
   }
 
   return (
-    <div className="ml-auto flex items-center gap-2">
+    <div className="flex items-center gap-2">
       <span className="hidden text-xs font-medium text-muted-foreground sm:inline">
         Viewing as
       </span>

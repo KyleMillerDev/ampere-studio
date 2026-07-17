@@ -1,7 +1,7 @@
-import { cookies } from "next/headers"
-
 import { AppSidebar } from "@/components/cms/app-sidebar"
 import { DashboardHeader } from "@/components/cms/dashboard-header"
+import { MobileBottomNav } from "@/components/cms/mobile-bottom-nav"
+import { UnreadSubmissionsBanner } from "@/components/cms/unread-submissions-banner"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import {
   getActiveClientId,
@@ -21,8 +21,6 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const cookieStore = await cookies()
-  const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false"
   const activeClientId = await getActiveClientId()
   const [activeClient, features] = await Promise.all([
     getActiveClient(),
@@ -52,7 +50,7 @@ export default async function DashboardLayout({
     : 0
 
   return (
-    <SidebarProvider defaultOpen={defaultOpen}>
+    <SidebarProvider defaultOpen>
       <AppSidebar
         clientName={activeClient.name}
         features={features}
@@ -68,8 +66,17 @@ export default async function DashboardLayout({
           activeClientId={activeClientId}
           devClients={devClients}
         />
-        <div className="flex-1 overflow-y-auto px-6 py-6">{children}</div>
+        <UnreadSubmissionsBanner count={unreadSubmissionsCount} />
+        <div className="flex-1 overflow-y-auto px-6 py-6 pb-20 md:pb-6">
+          {children}
+        </div>
       </SidebarInset>
+      <MobileBottomNav
+        features={features}
+        ordersEnabled={ordersEnabled}
+        squareOrdersEnabled={squareOrdersEnabled}
+        unreadSubmissionsCount={unreadSubmissionsCount}
+      />
     </SidebarProvider>
   )
 }

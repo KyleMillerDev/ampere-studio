@@ -11,7 +11,12 @@ import { listSubmissions } from "@/lib/cms/submissions"
 
 export const dynamic = "force-dynamic"
 
-export default async function SubmissionsPage() {
+export default async function SubmissionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ submissionId?: string; timestamp?: string }>
+}) {
+  const params = await searchParams
   const submissions = await listSubmissions()
 
   return (
@@ -29,7 +34,11 @@ export default async function SubmissionsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SubmissionsTable initialSubmissions={submissions} />
+          <SubmissionsTable
+            initialSubmissions={submissions}
+            focusSubmissionId={params.submissionId}
+            focusTimestamp={params.timestamp}
+          />
         </CardContent>
       </Card>
     </div>

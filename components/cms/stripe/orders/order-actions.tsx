@@ -1,6 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import {
+  useState,
+  type ComponentType,
+  type ReactElement,
+  type ReactNode,
+} from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -11,7 +16,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Separator } from "@/components/ui/separator"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +23,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import {
   Dialog,
   DialogContent,
@@ -34,45 +45,124 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import type { OrderView, TrackingCarrier } from "@/lib/stripe/orders"
+import type { OrderView, TrackingCarrier } from "@/lib/stripe/order-model"
 
-type DialogType = "tracking" | "receipt" | "status" | "refund" | "cancel" | null
+type DialogType =
+  | "tracking"
+  | "receipt"
+  | "status"
+  | "refund"
+  | "cancel"
+  | "archive"
+  | null
 
-interface OrderActionsProps {
-  order: OrderView
+function isCheckoutStatus(status: OrderView["status"]): boolean {
+  return status === "Abandoned" || status === "Checking out"
 }
 
-export function OrderActions({ order }: OrderActionsProps) {
+function isActionableOrder(order: OrderView): boolean {
+  return order.status !== "Failed" && !isCheckoutStatus(order.status)
+}
+
+type MenuItemProps = {
+  className?: string
+  onSelect?: (event: Event) => void
+  asChild?: boolean
+  children?: ReactNode
+}
+
+type MenuSeparatorProps = {
+  className?: string
+}
+
+function OrderMenuItems({
+  order,
+  onOpen,
+  Item,
+  Separator,
+}: {
+  order: OrderView
+  onOpen: (type: DialogType) => void
+  Item: ComponentType<MenuItemProps>
+  Separator: ComponentType<MenuSeparatorProps>
+}) {
+  const actionable = isActionableOrder(order)
+
+  return (
+    <>
+      <Item asChild>
+        <Link href={`/orders/${order.id}`}>View Order</Link>
+      </Item>
+      {actionable && (
+        <>
+          <Item onSelect={() => onOpen("tracking")}>Add Tracking</Item>
+          <Item asChild>
+            <Link href={`/orders/${order.id}/edit`}>Edit Order</Link>
+          </Item>
+          <Item onSelect={() => onOpen("receipt")}>Send receipt</Item>
+          <Item onSelect={() => onOpen("status")}>Change Status</Item>
+        </>
+      )}
+      {order.customerEmail ? (
+        <Item asChild>
+          <a href={`mailto:${order.customerEmail}`}>Email Customer</a>
+        </Item>
+      ) : null}
+      <Item onSelect={() => onOpen("archive")}>
+        {order.archived ? "Unarchive Order" : "Archive Order"}
+      </Item>
+      {actionable && (
+        <>
+          <Separator />
+          <div className="px-2 py-1 text-xs font-semibold text-destructive">
+            Danger Zone
+          </div>
+          <Item
+            className="text-destructive focus:text-destructive"
+            onSelect={() => onOpen("refund")}
+          >
+            Refund Order
+          </Item>
+          <Item
+            className="text-destructive focus:text-destructive"
+            onSelect={() => onOpen("cancel")}
+          >
+            Cancel Order
+          </Item>
+        </>
+      )}
+    </>
+  )
+}
+
+function OrderActionDialogs({
+  order,
+  open,
+  setOpen,
+}: {
+  order: OrderView
+  open: DialogType
+  setOpen: (type: DialogType) => void
+}) {
   const router = useRouter()
-  const [open, setOpen] = useState<DialogType>(null)
   const [loading, setLoading] = useState(false)
 
-  // Tracking state
   const [tracking, setTracking] = useState(order.tracking ?? "")
   const [carrier, setCarrier] = useState<TrackingCarrier>(
     order.trackingCarrier ?? "USPS"
   )
   const [notifyCustomer, setNotifyCustomer] = useState(true)
 
-  // Receipt state
   const [receiptTo, setReceiptTo] = useState(order.customerEmail ?? "")
   const [bccInputs, setBccInputs] = useState<string[]>([])
 
-  // Status state
   const [statusOverride, setStatusOverride] = useState(
-    order.statusOverride ?? ""
+    order.statusOverride ?? "none"
   )
 
-  // Refund state
   const [refundType, setRefundType] = useState<"full" | "custom">("full")
   const [customAmount, setCustomAmount] = useState("")
 
-  // Cancel state
   const [cancelRefund, setCancelRefund] = useState(true)
 
   async function post(path: string, body: unknown) {
@@ -133,7 +223,9 @@ export function OrderActions({ order }: OrderActionsProps) {
   async function handleStatus() {
     setLoading(true)
     try {
-      await post("status", { status_override: statusOverride })
+      await post("status", {
+        status_override: statusOverride === "none" ? "" : statusOverride,
+      })
       toast.success("Status updated.")
       setOpen(null)
       router.refresh()
@@ -182,61 +274,28 @@ export function OrderActions({ order }: OrderActionsProps) {
     }
   }
 
+  async function handleArchive() {
+    setLoading(true)
+    try {
+      await post("archive", { archived: !order.archived })
+      toast.success(order.archived ? "Order unarchived." : "Order archived.")
+      setOpen(null)
+      router.refresh()
+    } catch (e: unknown) {
+      toast.error(
+        e instanceof Error
+          ? e.message
+          : order.archived
+            ? "Failed to unarchive order."
+            : "Failed to archive order."
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Order actions">
-            <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem asChild>
-            <Link href={`/orders/${order.id}`}>View Order</Link>
-          </DropdownMenuItem>
-          {order.status !== "Failed" && (
-            <>
-              <DropdownMenuItem onSelect={() => setOpen("tracking")}>
-                Add Tracking
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href={`/orders/${order.id}/edit`}>Edit Order</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setOpen("receipt")}>
-                Send receipt
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setOpen("status")}>
-                Change Status
-              </DropdownMenuItem>
-            </>
-          )}
-          <DropdownMenuItem asChild>
-            <a href={`mailto:${order.customerEmail ?? ""}`}>Email Customer</a>
-          </DropdownMenuItem>
-          {order.status !== "Failed" && (
-            <>
-              <DropdownMenuSeparator />
-              <div className="px-2 py-1 text-xs font-semibold text-destructive">
-                Danger Zone
-              </div>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={() => setOpen("refund")}
-              >
-                Refund Order
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={() => setOpen("cancel")}
-              >
-                Cancel Order
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {/* Add Tracking */}
       <Dialog open={open === "tracking"} onOpenChange={() => setOpen(null)}>
         <DialogContent>
           <DialogHeader>
@@ -294,7 +353,6 @@ export function OrderActions({ order }: OrderActionsProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Send Receipt */}
       <Dialog open={open === "receipt"} onOpenChange={() => setOpen(null)}>
         <DialogContent>
           <DialogHeader>
@@ -348,7 +406,6 @@ export function OrderActions({ order }: OrderActionsProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Change Status */}
       <Dialog open={open === "status"} onOpenChange={() => setOpen(null)}>
         <DialogContent>
           <DialogHeader>
@@ -364,7 +421,7 @@ export function OrderActions({ order }: OrderActionsProps) {
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (auto-derive)</SelectItem>
+                <SelectItem value="none">None (auto-derive)</SelectItem>
                 <SelectItem value="shipped">Shipped</SelectItem>
                 <SelectItem value="complete">Complete</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -382,7 +439,6 @@ export function OrderActions({ order }: OrderActionsProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Refund Order */}
       <Dialog open={open === "refund"} onOpenChange={() => setOpen(null)}>
         <DialogContent>
           <DialogHeader>
@@ -442,7 +498,6 @@ export function OrderActions({ order }: OrderActionsProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Order */}
       <Dialog open={open === "cancel"} onOpenChange={() => setOpen(null)}>
         <DialogContent>
           <DialogHeader>
@@ -483,6 +538,124 @@ export function OrderActions({ order }: OrderActionsProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={open === "archive"} onOpenChange={() => setOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {order.archived ? "Unarchive Order" : "Archive Order"}
+            </DialogTitle>
+            <DialogDescription>
+              {order.archived
+                ? `Order #${order.confirmationNumber} will show in the default orders list again.`
+                : `Order #${order.confirmationNumber} will be hidden from the default list. It stays in Stripe and can be shown again by enabling the Archived status filter.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleArchive} disabled={loading}>
+              {loading
+                ? order.archived
+                  ? "Unarchiving…"
+                  : "Archiving…"
+                : order.archived
+                  ? "Unarchive"
+                  : "Archive"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+interface OrderActionsProps {
+  order: OrderView
+}
+
+/** 3-dot actions menu (order detail page and similar). */
+export function OrderActions({ order }: OrderActionsProps) {
+  const [open, setOpen] = useState<DialogType>(null)
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Order actions">
+            <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <OrderMenuItems
+            order={order}
+            onOpen={setOpen}
+            Item={DropdownMenuItem}
+            Separator={DropdownMenuSeparator}
+          />
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <OrderActionDialogs order={order} open={open} setOpen={setOpen} />
+    </>
+  )
+}
+
+/**
+ * List-row helper: right-click on the main row or expanded content opens the
+ * same actions menu at the cursor. Pass the 3-dot control via the render callback.
+ */
+export function OrderRowActions({
+  order,
+  children,
+  expandedRow,
+  onContextMenuOpenChange,
+}: {
+  order: OrderView
+  /** Must return a single element (e.g. TableRow) that can take a ref. */
+  children: (dropdown: ReactNode) => ReactElement
+  /** Optional expanded row; also acts as a right-click trigger. */
+  expandedRow?: ReactElement | null
+  /** Fires when the right-click / long-press menu opens or closes. */
+  onContextMenuOpenChange?: (open: boolean) => void
+}) {
+  const [open, setOpen] = useState<DialogType>(null)
+
+  const dropdown = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Order actions">
+          <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <OrderMenuItems
+          order={order}
+          onOpen={setOpen}
+          Item={DropdownMenuItem}
+          Separator={DropdownMenuSeparator}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
+  return (
+    <>
+      <ContextMenu onOpenChange={onContextMenuOpenChange}>
+        <ContextMenuTrigger asChild>{children(dropdown)}</ContextMenuTrigger>
+        {expandedRow ? (
+          <ContextMenuTrigger asChild>{expandedRow}</ContextMenuTrigger>
+        ) : null}
+        <ContextMenuContent className="w-44">
+          <OrderMenuItems
+            order={order}
+            onOpen={setOpen}
+            Item={ContextMenuItem}
+            Separator={ContextMenuSeparator}
+          />
+        </ContextMenuContent>
+      </ContextMenu>
+      <OrderActionDialogs order={order} open={open} setOpen={setOpen} />
     </>
   )
 }

@@ -2,133 +2,64 @@ import type Stripe from "stripe"
 
 import { getStripeClient } from "@/lib/stripe/config"
 import { StripeNotConfiguredError } from "@/lib/stripe/products"
+import { getCatalogMap } from "@/lib/stripe/catalog"
+import type { CatalogMap, CatalogProduct } from "@/lib/stripe/catalog-types"
+import { formatStripeAmount } from "@/lib/utils"
 import {
-  getCatalogMap,
-  type CatalogMap,
-  type CatalogProduct,
-} from "@/lib/stripe/catalog"
+  buildLinesMetadata,
+  CHECKOUT_ABANDON_SECONDS,
+  confirmationNumber,
+  orderNetAmount,
+  parseLineMetadata,
+  type EnrichedLineItem,
+  type OrderHistoryEvent,
+  type OrderLineRef,
+  type OrderPaymentMethod,
+  type OrderRefund,
+  type OrderStatus,
+  type OrderView,
+  type StatusOverride,
+  type TrackingCarrier,
+} from "@/lib/stripe/order-model"
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+export type {
+  EnrichedLineItem,
+  OrderHistoryEvent,
+  OrderHistoryKind,
+  OrderLineChange,
+  OrderLineRef,
+  OrderPaymentMethod,
+  OrderRefund,
+  OrderStatus,
+  OrderView,
+  StatusOverride,
+  TrackingCarrier,
+} from "@/lib/stripe/order-model"
 
-export type OrderStatus =
-  | "Paid"
-  | "Shipped"
-  | "Complete"
-  | "Cancelled"
-  | "Refunded"
-  | "Partially Refunded"
-  | "Disputed"
-  | "Failed"
-export type TrackingCarrier = "USPS" | "UPS" | "FEDEX" | "Other"
-export type StatusOverride = "shipped" | "complete" | "cancelled"
-
-export interface OrderLineRef {
-  ref: string
-  quantity: number
-}
-
-export interface EnrichedLineItem {
-  ref: string
-  productId: string | null
-  name: string
-  slug: string | null
-  image: string | null
-  quantity: number
-  unitAmount: number | null
-  lineTotal: number | null
-}
-
-export interface OrderRefund {
-  id: string
-  amount: number
-  created: number
-  status: string
-  reason: string | null
-}
-
-export interface OrderView {
-  id: string
-  confirmationNumber: string
-  amount: number
-  currency: string
-  status: OrderStatus
-  created: number
-  customerEmail: string | null
-  customerName: string | null
-  shipping: Stripe.PaymentIntent["shipping"] | null
-  lineItems: EnrichedLineItem[]
-  subtotal: number | null
-  shippingCost: number | null
-  tracking: string | null
-  trackingCarrier: TrackingCarrier | null
-  shippedAt: number | null
-  statusOverride: StatusOverride | null
-  rawMetadata: Record<string, string>
-  hasDispute: boolean
-  /** True when the charge is fully refunded. */
-  isRefunded: boolean
-  /** True when some (but not all) of the charge has been refunded. */
-  isPartiallyRefunded: boolean
-  /** Total refunded in cents (sum of all refunds). */
-  refundedAmount: number
-  /** Net amount retained after refunds (cents). */
-  netAmount: number
-  /** Individual Stripe refunds, newest first when available. */
-  refunds: OrderRefund[]
-}
+export {
+  buildLinesMetadata,
+  buildOrderLineChanges,
+  carrierTrackingUrl,
+  CHECKOUT_ABANDON_SECONDS,
+  confirmationNumber,
+  formatOrderProductName,
+  OPT_IN_ORDER_STATUS_FILTERS,
+  orderLineQuantitiesDiffer,
+  orderNetAmount,
+  parseLineMetadata,
+} from "@/lib/stripe/order-model"
 
 /** Expand paths for PaymentIntent order reads. */
-const ORDER_EXPAND = ["latest_charge", "latest_charge.refunds"] as const
+const ORDER_EXPAND = [
+  "latest_charge",
+  "latest_charge.refunds",
+  "latest_charge.dispute",
+] as const
 const ORDER_LIST_EXPAND = [
   "data.latest_charge",
   "data.latest_charge.refunds",
+  "data.latest_charge.dispute",
 ] as const
-
-/** Net amount kept after refunds (never negative). */
-export function orderNetAmount(amount: number, refundedAmount: number): number {
-  return Math.max(0, amount - refundedAmount)
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Customer-facing confirmation number = last 12 chars of PI id, uppercased. */
-export function confirmationNumber(piId: string): string {
-  return piId.slice(-12).toUpperCase()
-}
-
-/** Parse metadata.lines into ref/quantity pairs. */
-export function parseLineMetadata(lines: string | undefined): OrderLineRef[] {
-  if (!lines) return []
-  return lines
-    .split("|")
-    .map((entry) => {
-      const match = entry.trim().match(/^(.+?)x(\d+)$/i)
-      if (!match) return null
-      return { ref: match[1].trim(), quantity: parseInt(match[2], 10) }
-    })
-    .filter((x): x is OrderLineRef => x !== null && x.quantity > 0)
-}
-
-/**
- * Rebuild the metadata.lines string from enriched items.
- * Uses product id as the ref, capped at 480 chars.
- */
-export function buildLinesMetadata(
-  items: Array<{ ref: string; quantity: number }>
-): string {
-  const parts = items.map((i) => `${i.ref}x${i.quantity}`)
-  let result = parts.join("|")
-  if (result.length > 480) {
-    result = result.slice(0, 480)
-    const lastPipe = result.lastIndexOf("|")
-    if (lastPipe > 0) result = result.slice(0, lastPipe)
-  }
-  return result
-}
 
 /** Enrich parsed line refs against the catalog map. */
 export function buildEnrichedOrderItems(
@@ -143,6 +74,7 @@ export function buildEnrichedOrderItems(
         productId: null,
         name: `Missing (${ref})`,
         slug: null,
+        partNumber: null,
         image: null,
         quantity,
         unitAmount: null,
@@ -154,6 +86,7 @@ export function buildEnrichedOrderItems(
       productId: product.id,
       name: product.name,
       slug: product.slug,
+      partNumber: product.partNumber,
       image: product.image,
       quantity,
       unitAmount: product.unitAmount,
@@ -199,6 +132,65 @@ function resolveCharge(pi: Stripe.PaymentIntent): Stripe.Charge | null {
   return pi.latest_charge as Stripe.Charge
 }
 
+const PAYMENT_TYPE_LABELS: Record<string, string> = {
+  card: "Card",
+  link: "Link",
+  amazon_pay: "Amazon Pay",
+  affirm: "Affirm",
+  afterpay_clearpay: "Afterpay",
+  alipay: "Alipay",
+  cashapp: "Cash App",
+  klarna: "Klarna",
+  paypal: "PayPal",
+  us_bank_account: "Bank account",
+  apple_pay: "Apple Pay",
+  google_pay: "Google Pay",
+}
+
+function titleCaseType(type: string): string {
+  return type
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ")
+}
+
+/** Normalize charge.payment_method_details into a list-friendly shape. */
+export function extractPaymentMethod(
+  charge: Stripe.Charge | null
+): OrderPaymentMethod | null {
+  const details = charge?.payment_method_details
+  if (!details?.type) return null
+
+  const type = details.type
+
+  if (type === "card" && details.card) {
+    const brand = details.card.brand ?? null
+    const last4 = details.card.last4 ?? null
+    return {
+      type: "card",
+      brand,
+      last4,
+      label: last4 ? `•••• ${last4}` : (PAYMENT_TYPE_LABELS.card ?? "Card"),
+    }
+  }
+
+  if (type === "link") {
+    return {
+      type: "link",
+      brand: "link",
+      last4: null,
+      label: "Link",
+    }
+  }
+
+  return {
+    type,
+    brand: type,
+    last4: null,
+    label: PAYMENT_TYPE_LABELS[type] ?? titleCaseType(type),
+  }
+}
+
 /** Map expanded charge.refunds into OrderRefund records. */
 function extractRefunds(charge: Stripe.Charge | null): OrderRefund[] {
   const data = charge?.refunds?.data
@@ -209,7 +201,7 @@ function extractRefunds(charge: Stripe.Charge | null): OrderRefund[] {
       amount: r.amount,
       created: r.created,
       status: r.status ?? "unknown",
-      reason: r.reason ?? null,
+      reason: r.reason ?? r.metadata?.reason ?? null,
     }))
     .sort((a, b) => b.created - a.created)
 }
@@ -249,15 +241,156 @@ function hasFailedPayment(
 }
 
 /**
+ * Build a user-facing timeline from PaymentIntent + charge state.
+ * Skips developer-only Stripe event noise (charge IDs, raw object updates).
+ */
+export function buildOrderHistory(
+  pi: Stripe.PaymentIntent,
+  charge: Stripe.Charge | null,
+  refunds: OrderRefund[]
+): OrderHistoryEvent[] {
+  const events: OrderHistoryEvent[] = []
+  const currency = pi.currency
+
+  events.push({
+    id: `${pi.id}:started`,
+    kind: "payment_started",
+    label: "Payment started",
+    created: pi.created,
+  })
+
+  if (pi.status === "requires_action") {
+    events.push({
+      id: `${pi.id}:pending_verification`,
+      kind: "pending_verification",
+      label: "Pending verification",
+      created: pi.created,
+    })
+  }
+
+  if (pi.status === "processing") {
+    events.push({
+      id: `${pi.id}:processing`,
+      kind: "payment_processing",
+      label: "Payment processing",
+      created: charge?.created ?? pi.created,
+    })
+  }
+
+  if (hasFailedPayment(pi, charge)) {
+    events.push({
+      id: `${pi.id}:failed`,
+      kind: "payment_failed",
+      label: "Payment failed",
+      created: charge?.created ?? pi.created,
+    })
+  }
+
+  if (pi.status === "requires_capture") {
+    events.push({
+      id: `${pi.id}:authorized`,
+      kind: "payment_authorized",
+      label: "Payment authorized",
+      created: charge?.created ?? pi.created,
+    })
+  }
+
+  if (pi.status === "succeeded") {
+    events.push({
+      id: `${pi.id}:succeeded`,
+      kind: "payment_succeeded",
+      label: "Payment succeeded",
+      created: charge?.created ?? pi.created,
+    })
+  }
+
+  if (pi.status === "canceled" && pi.canceled_at) {
+    events.push({
+      id: `${pi.id}:cancelled`,
+      kind: "payment_cancelled",
+      label: "Payment cancelled",
+      created: pi.canceled_at,
+    })
+  }
+
+  for (const refund of refunds) {
+    const amountLabel = formatStripeAmount(refund.amount, currency)
+    const fromEdit = refund.reason === "order_edit"
+    events.push({
+      id: refund.id,
+      kind: "refund",
+      label: fromEdit
+        ? `Refund from order edit (${amountLabel})`
+        : `Refund issued (${amountLabel})`,
+      created: refund.created,
+    })
+  }
+
+  const editedAtStr = pi.metadata?.edited_at
+  const editedAt = editedAtStr ? parseInt(editedAtStr, 10) : null
+  if (editedAt) {
+    events.push({
+      id: `${pi.id}:edited`,
+      kind: "edited",
+      label: "Order edited",
+      created: editedAt,
+    })
+  }
+
+  const shippedAtStr = pi.metadata?.shipped_at
+  const shippedAt = shippedAtStr ? parseInt(shippedAtStr, 10) : null
+  if (shippedAt) {
+    events.push({
+      id: `${pi.id}:shipped`,
+      kind: "shipped",
+      label: "Order shipped",
+      created: shippedAt,
+    })
+  }
+
+  // Stripe expands `latest_charge.dispute` as a Dispute object when present.
+  const dispute = (
+    charge as
+      | (Stripe.Charge & { dispute?: Stripe.Dispute | string | null })
+      | null
+  )?.dispute
+  if (dispute && typeof dispute !== "string") {
+    events.push({
+      id: dispute.id,
+      kind: "disputed",
+      label: "Dispute opened",
+      created: dispute.created,
+    })
+  }
+
+  return events.sort((a, b) => {
+    if (b.created !== a.created) return b.created - a.created
+    return a.label.localeCompare(b.label)
+  })
+}
+
+export function isArchivedPaymentIntent(pi: Stripe.PaymentIntent): boolean {
+  return pi.metadata?.archived === "true"
+}
+
+/**
  * Derive the display status for a PaymentIntent.
+ * Incomplete: Checking out (<15m) or Abandoned (>=15m).
  * Non-succeeded: Failed (attempted) or Cancelled.
  * Succeeded priority:
  *   Disputed > Refunded > Cancelled > Partially Refunded > Complete > Shipped > Paid
+ * Archived is a separate metadata flag (order.archived), not a status.
  */
 export function deriveOrderStatus(
   pi: Stripe.PaymentIntent,
   charge: Stripe.Charge | null
 ): OrderStatus {
+  if (isIncompletePaymentIntent(pi)) {
+    const ageSeconds = Math.floor(Date.now() / 1000) - pi.created
+    if (ageSeconds < CHECKOUT_ABANDON_SECONDS) return "Checking out"
+    return "Abandoned"
+  }
+
   if (pi.status !== "succeeded") {
     if (hasFailedPayment(pi, charge)) return "Failed"
     if (pi.status === "canceled") return "Cancelled"
@@ -281,24 +414,6 @@ export function deriveOrderStatus(
   return "Paid"
 }
 
-/** Build a carrier tracking URL or null for "Other". */
-export function carrierTrackingUrl(
-  carrier: TrackingCarrier | null,
-  trackingNumber: string
-): string | null {
-  if (!trackingNumber) return null
-  switch (carrier) {
-    case "USPS":
-      return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(trackingNumber)}`
-    case "UPS":
-      return `https://www.ups.com/track?tracknum=${encodeURIComponent(trackingNumber)}`
-    case "FEDEX":
-      return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(trackingNumber)}`
-    default:
-      return null
-  }
-}
-
 function toOrderView(
   pi: Stripe.PaymentIntent,
   catalogMap: CatalogMap
@@ -306,6 +421,8 @@ function toOrderView(
   const charge = resolveCharge(pi)
   const refs = parseLineMetadata(pi.metadata?.lines)
   const lineItems = buildEnrichedOrderItems(refs, catalogMap)
+  const originalRefs = parseLineMetadata(pi.metadata?.original_lines)
+  const originalLineItems = buildEnrichedOrderItems(originalRefs, catalogMap)
   const status = deriveOrderStatus(pi, charge)
   const tracking = (pi.metadata?.tracking ?? "") || null
   const rawCarrier = pi.metadata?.tracking_carrier as string | undefined
@@ -320,8 +437,16 @@ function toOrderView(
   const shippedAtStr = pi.metadata?.shipped_at
   const shippedAt = shippedAtStr ? parseInt(shippedAtStr, 10) : null
 
+  const editedAtStr = pi.metadata?.edited_at
+  const editedAt = editedAtStr ? parseInt(editedAtStr, 10) : null
+
   const subtotalStr = pi.metadata?.subtotal
   const subtotal = subtotalStr ? parseInt(subtotalStr, 10) : null
+
+  const originalSubtotalStr = pi.metadata?.original_subtotal
+  const originalSubtotal = originalSubtotalStr
+    ? parseInt(originalSubtotalStr, 10)
+    : null
 
   const shippingCostStr = pi.metadata?.shipping
   const shippingCost = shippingCostStr ? parseInt(shippingCostStr, 10) : null
@@ -329,6 +454,8 @@ function toOrderView(
   const refundedAmount = charge?.amount_refunded ?? 0
   const fullyRefunded = isFullyRefunded(charge)
   const partiallyRefunded = isPartiallyRefundedCharge(charge)
+  const refunds = extractRefunds(charge)
+  const archived = isArchivedPaymentIntent(pi)
 
   return {
     id: pi.id,
@@ -341,19 +468,25 @@ function toOrderView(
     customerName: pi.shipping?.name ?? null,
     shipping: pi.shipping ?? null,
     lineItems,
+    originalLineItems,
     subtotal,
+    originalSubtotal,
     shippingCost,
     tracking,
     trackingCarrier,
     shippedAt,
+    editedAt,
     statusOverride: (pi.metadata?.status_override as StatusOverride) ?? null,
+    archived,
     rawMetadata: { ...pi.metadata } as Record<string, string>,
     hasDispute: hasActiveDispute(charge),
     isRefunded: fullyRefunded,
     isPartiallyRefunded: partiallyRefunded,
     refundedAmount,
     netAmount: orderNetAmount(pi.amount, refundedAmount),
-    refunds: extractRefunds(charge),
+    refunds,
+    history: buildOrderHistory(pi, charge, refunds),
+    paymentMethod: extractPaymentMethod(charge),
   }
 }
 
@@ -376,8 +509,7 @@ export async function listStripeOrders(): Promise<OrderView[]> {
     limit: 100,
     expand: [...ORDER_LIST_EXPAND],
   })) {
-    // Hide abandoned incomplete checkouts only; keep failed/canceled/etc.
-    if (isIncompletePaymentIntent(pi)) continue
+    // Include incomplete checkouts as Checking out / Abandoned (opt-in in UI).
     orders.push(toOrderView(pi, catalogMap))
   }
 
@@ -392,7 +524,6 @@ export async function getStripeOrder(id: string): Promise<OrderView | null> {
     const pi = await stripe.paymentIntents.retrieve(id, {
       expand: [...ORDER_EXPAND],
     })
-    if (isIncompletePaymentIntent(pi)) return null
     return toOrderView(pi, catalogMap)
   } catch (err) {
     const e = err as { code?: string }
@@ -443,6 +574,24 @@ export async function setStatusOverride(
     metadata: {
       ...pi.metadata,
       status_override: statusOverride,
+    },
+  })
+
+  const catalogMap = await getCatalogMap()
+  return toOrderView(updated, catalogMap)
+}
+
+export async function setOrderArchived(
+  id: string,
+  archived: boolean
+): Promise<OrderView> {
+  const stripe = await requireStripe()
+  const pi = await stripe.paymentIntents.retrieve(id)
+
+  const updated = await stripe.paymentIntents.update(id, {
+    metadata: {
+      ...pi.metadata,
+      archived: archived ? "true" : "",
     },
   })
 
@@ -517,6 +666,7 @@ export async function updateOrderItems(
   const newTotal = Math.max(0, subtotal + shippingCost - discountAmount)
   const delta = newTotal - pi.amount
   const linesStr = buildLinesMetadata(items)
+  const priorLines = pi.metadata?.lines ?? ""
 
   const baseMetadata: Record<string, string> = {
     ...(pi.metadata as Record<string, string>),
@@ -524,9 +674,27 @@ export async function updateOrderItems(
     subtotal: String(subtotal),
   }
 
+  // Freeze checkout composition on the first edit that changes lines.
+  // Never overwrite after that so "original" always means the placed order.
+  if (!baseMetadata.original_lines && priorLines && priorLines !== linesStr) {
+    baseMetadata.original_lines = priorLines
+    if (pi.metadata?.subtotal) {
+      baseMetadata.original_subtotal = pi.metadata.subtotal
+    }
+    baseMetadata.edited_at = String(Math.floor(Date.now() / 1000))
+  }
+
   if (delta < 0) {
     const diff = pi.amount - newTotal
-    await stripe.refunds.create({ payment_intent: id, amount: diff })
+    await stripe.refunds.create({
+      payment_intent: id,
+      amount: diff,
+      metadata: {
+        reason: "order_edit",
+        lines_before: priorLines.slice(0, 480),
+        lines_after: linesStr.slice(0, 480),
+      },
+    })
   }
   // For delta > 0 (total increased): we record the new intended totals in
   // metadata and mark the delta as outstanding. The admin must collect the

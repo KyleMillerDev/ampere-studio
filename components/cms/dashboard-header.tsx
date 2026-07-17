@@ -12,9 +12,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import { DevClientSelector } from "@/components/cms/dev-client-selector"
+import { ThemeToggle } from "@/components/theme-toggle"
 import type { ClientOption } from "@/lib/cms/clients"
 
 const LABELS: Record<string, string> = {
@@ -53,8 +52,6 @@ export function DashboardHeader({
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background/90 px-4 backdrop-blur supports-backdrop-filter:bg-background/70">
-      <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mx-2 h-4" />
       <Breadcrumb>
         <BreadcrumbList>
           {segments.length === 0 ? (
@@ -83,12 +80,15 @@ export function DashboardHeader({
           )}
         </BreadcrumbList>
       </Breadcrumb>
-      {process.env.NODE_ENV === "development" ? (
-        <DevClientSelector
-          activeClientId={activeClientId}
-          clients={devClients}
-        />
-      ) : null}
+      <div className="ml-auto flex items-center gap-2">
+        {process.env.NODE_ENV === "development" ? (
+          <DevClientSelector
+            activeClientId={activeClientId}
+            clients={devClients}
+          />
+        ) : null}
+        <ThemeToggle />
+      </div>
     </header>
   )
 }

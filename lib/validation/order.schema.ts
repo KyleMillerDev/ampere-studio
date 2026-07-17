@@ -33,6 +33,11 @@ export const cancelOrderSchema = z.object({
 })
 export type CancelOrderInput = z.infer<typeof cancelOrderSchema>
 
+export const archiveOrderSchema = z.object({
+  archived: z.boolean(),
+})
+export type ArchiveOrderInput = z.infer<typeof archiveOrderSchema>
+
 export const sendReceiptSchema = z.object({
   to: z.string().email("Invalid recipient email"),
   bcc: z.array(z.string().email("Invalid BCC email")).default([]),

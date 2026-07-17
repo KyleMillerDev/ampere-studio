@@ -1,7 +1,7 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
-import type { OrderStatus } from "@/lib/stripe/orders"
+import type { OrderStatus } from "@/lib/stripe/order-model"
 
 const STATUS_VARIANT: Record<
   OrderStatus,
@@ -15,6 +15,8 @@ const STATUS_VARIANT: Record<
   "Partially Refunded": "outline",
   Disputed: "destructive",
   Failed: "destructive",
+  Abandoned: "outline",
+  "Checking out": "secondary",
 }
 
 const STATUS_CLASS: Record<OrderStatus, string> = {
@@ -32,6 +34,10 @@ const STATUS_CLASS: Record<OrderStatus, string> = {
     "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300",
   Failed:
     "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300",
+  Abandoned:
+    "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-900/40 dark:text-zinc-300",
+  "Checking out":
+    "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300",
 }
 
 interface OrderStatusBadgeProps {

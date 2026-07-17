@@ -20,13 +20,21 @@ follow this contract exactly.
 ## 1. Orders are Stripe PaymentIntents
 
 - An order IS a `PaymentIntent`. There is no separate orders database.
-- **Hide incomplete checkouts only.** Skip PIs still in
-  `requires_payment_method`, `requires_confirmation`, `requires_action`, or
-  `processing` when there was no payment attempt outcome.
+- **Include incomplete checkouts** in the list as opt-in statuses (hidden by
+  default in the UI status filter):
+  - **Checking out** — incomplete PI younger than 15 minutes
+  - **Abandoned** — incomplete PI 15 minutes or older
+- Incomplete means still in `requires_payment_method`,
+  `requires_confirmation`, `requires_action`, or `processing` with no payment
+  attempt outcome.
 - **Do show** `succeeded`, `canceled`, `requires_capture`, and any PI with a
   failed attempt (`last_payment_error` or a failed `latest_charge`). Failed
   attempts display as status `Failed`.
+- **Archived** orders (`metadata.archived === "true"`) are hidden from the
+  default list and only appear when the Archived status filter is enabled.
+  Archiving does not delete the PaymentIntent in Stripe.
 - Always expand `latest_charge` when fetching PIs for order data.
+- Analytics should still skip incomplete checkouts (they are not revenue).
 
 ---
 
@@ -65,17 +73,22 @@ Every value comes from the `Ampere-Clients` DynamoDB record keyed by
 
 All metadata values are **strings** (Stripe stores them that way).
 
-| Key                   | Type                   | Description                                                                                                      |
-| --------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `lines`               | string                 | Line items. Format: `"{productId}x{qty}\|{productId}x{qty}\|..."`. Max 480 chars. Parse with `/^(.+?)x(\d+)$/i`. |
-| `subtotal`            | string (integer cents) | Subtotal in cents, not including shipping.                                                                       |
-| `shipping`            | string (integer cents) | Shipping cost in cents.                                                                                          |
-| `shipping_source`     | string                 | `"rate-table"` or `"easypost"` (informational, written by the client site).                                      |
-| `tracking`            | string                 | Carrier tracking number. May be empty.                                                                           |
-| `tracking_carrier`    | string                 | One of `"USPS" \| "UPS" \| "FEDEX" \| "Other"`. Written by this dashboard.                                       |
-| `status_override`     | string                 | One of `"shipped" \| "complete" \| "cancelled"`. Written by this dashboard via Change Status.                    |
-| `shipped_at`          | string (unix seconds)  | Set the first time tracking is added. Written by this dashboard.                                                 |
-| `outstanding_invoice` | string                 | Stripe Invoice ID. Set when an edit raises the total (delta collected via Invoice).                              |
+| Key                   | Type                   | Description                                                                                                              |
+| --------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `lines`               | string                 | Current line items. Format: `"{productId}x{qty}\|{productId}x{qty}\|..."`. Max 480 chars. Parse with `/^(.+?)x(\d+)$/i`. |
+| `subtotal`            | string (integer cents) | Current subtotal in cents, not including shipping.                                                                       |
+| `original_lines`      | string                 | Checkout line snapshot. Set once on the first edit that changes `lines`; never overwrite afterward.                      |
+| `original_subtotal`   | string (integer cents) | Checkout subtotal snapshot. Set with `original_lines` on first edit.                                                     |
+| `edited_at`           | string (unix seconds)  | Set when `original_lines` is first frozen.                                                                               |
+| `shipping`            | string (integer cents) | Shipping cost in cents.                                                                                                  |
+| `shipping_source`     | string                 | `"rate-table"` or `"easypost"` (informational, written by the client site).                                              |
+| `tracking`            | string                 | Carrier tracking number. May be empty.                                                                                   |
+| `tracking_carrier`    | string                 | One of `"USPS" \| "UPS" \| "FEDEX" \| "Other"`. Written by this dashboard.                                               |
+| `status_override`     | string                 | One of `"shipped" \| "complete" \| "cancelled"`. Written by this dashboard via Change Status.                            |
+| `shipped_at`          | string (unix seconds)  | Set the first time tracking is added. Written by this dashboard.                                                         |
+| `archived`            | string                 | `"true"` when the order is archived in the dashboard. Empty/absent when not archived. Does not delete the PI.            |
+| `outstanding_delta`   | string (integer cents) | Uncollected increase after an edit that raised the total.                                                                |
+| `outstanding_invoice` | string                 | Stripe Invoice ID. Set when an edit raises the total (delta collected via Invoice).                                      |
 
 **CRITICAL: Always merge metadata on update.** Retrieve the PI, spread
 `pi.metadata`, then set your keys. Stripe replaces the entire metadata object
@@ -102,20 +115,30 @@ await stripe.paymentIntents.update(id, {
 3. Build a `CatalogMap` keyed by `product.id`, `product.metadata.part_number`,
    and `product.metadata.slug` for resilient matching.
 4. For each ref, match in that order. Produce:
-   `{ ref, productId, name, slug, image: images[0], quantity, unitAmount: default_price.unit_amount, lineTotal }`.
-5. If no match: `name = "Missing (<ref>)"`, `image = null`, `unitAmount = null`.
+   `{ ref, productId, name, slug, partNumber: metadata.part_number, image: images[0], quantity, unitAmount: default_price.unit_amount, lineTotal }`.
+5. If no match: `name = "Missing (<ref>)"`, `partNumber = null`, `image = null`, `unitAmount = null`.
+6. In the orders list UI, when `partNumber` is set, display the product name as
+   `{partNumber} - {name}`. Otherwise display `name` alone.
 
 ---
 
 ## 6. Derived order status (badge) — priority order
 
-For non-succeeded PaymentIntents:
+Opt-in list filters (hidden unless selected in the status filter):
+**Archived**, **Abandoned**, **Checking out**.
+
+1. **Checking out** — incomplete PI younger than 15 minutes.
+2. **Abandoned** — incomplete PI 15 minutes or older.
+3. **Archived** — filter-only. `metadata.archived === "true"` hides the order
+   from the default list; the order keeps its real fulfillment status.
+
+For other non-succeeded PaymentIntents:
 
 1. **Failed** — `last_payment_error` is set, or `latest_charge.status === "failed"`.
 2. **Cancelled** — PI `status === "canceled"` without a failed attempt.
 3. **Paid** — PI `status === "requires_capture"` (authorized, not yet captured).
 
-Given a `succeeded` PaymentIntent, compute the display status:
+Given a `succeeded` PaymentIntent (not archived), compute the display status:
 
 1. **Disputed** — `latest_charge` has an active dispute (not `won` or `lost`).
 2. **Refunded** — charge is fully refunded (`charge.refunded === true`).
@@ -125,10 +148,16 @@ Given a `succeeded` PaymentIntent, compute the display status:
 6. **Shipped** — `metadata.status_override === "shipped"` OR `metadata.tracking` is non-empty.
 7. **Paid** — default fallback.
 
-Always expand `latest_charge` and `latest_charge.refunds` when reading orders so
-refund timestamps and per-refund amounts are available. `OrderView` exposes
-`refundedAmount`, `netAmount` (original minus refunded), `isRefunded`,
-`isPartiallyRefunded`, and `refunds[]`.
+Always expand `latest_charge`, `latest_charge.refunds`, and
+`latest_charge.dispute` when reading orders so refund/dispute timestamps are
+available. `OrderView` exposes `refundedAmount`, `netAmount` (original minus
+refunded), `isRefunded`, `isPartiallyRefunded`, `refunds[]`, a user-facing
+`history[]` timeline (payment started/succeeded/failed, refunds, shipped,
+edited, disputes), and `paymentMethod` (from
+`latest_charge.payment_method_details`: card brand + last4, or APM label).
+History is derived from PI/charge state, not the Stripe Events API, must stay
+free of developer-only charge/PI IDs, and is shown on the order detail page
+only (not the orders list).
 
 `status_override` wins over tracking-based inference, but full/partial refund
 state takes priority over fulfillment statuses. Set override explicitly via
@@ -201,6 +230,11 @@ A `succeeded` PI's captured amount cannot be increased in place:
 Always keep `metadata.lines`, `metadata.subtotal`, and `metadata.shipping`
 consistent with the intended order contents (not necessarily with the net-charged
 amount after partial refunds).
+
+On the first edit that changes `lines`, freeze the prior values into
+`original_lines` / `original_subtotal` and set `edited_at`. Do not overwrite
+those keys on later edits. Edit refunds should include refund metadata
+`reason: "order_edit"` plus `lines_before` / `lines_after` when possible.
 
 ---
 

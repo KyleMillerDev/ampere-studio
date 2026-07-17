@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { formatStripeAmount } from "@/lib/utils"
-import type { OrderView } from "@/lib/stripe/orders"
-import type { CatalogProduct } from "@/lib/stripe/catalog"
+import type { OrderView } from "@/lib/stripe/order-model"
+import type { CatalogProduct } from "@/lib/stripe/catalog-types"
 
 interface EditorItem {
   ref: string

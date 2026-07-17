@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -18,15 +19,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import type {
-  OrderView,
-  OrderStatus,
-  TrackingCarrier,
-} from "@/lib/stripe/orders"
-import type { CatalogProduct } from "@/lib/stripe/catalog"
+import {
+  OPT_IN_ORDER_STATUS_FILTERS,
+  type OrderView,
+  type OrderStatusFilter,
+  type TrackingCarrier,
+} from "@/lib/stripe/order-model"
+import type { CatalogProduct } from "@/lib/stripe/catalog-types"
 
 export interface OrderFilters {
-  status?: OrderStatus
+  /** When set and non-empty, only these statuses are shown. */
+  statuses?: OrderStatusFilter[]
   dateFrom?: string
   dateTo?: string
   totalMin?: number
@@ -36,6 +39,23 @@ export interface OrderFilters {
   hasDispute?: boolean
   isRefunded?: boolean
 }
+
+export const ORDER_STATUS_OPTIONS: OrderStatusFilter[] = [
+  "Paid",
+  "Shipped",
+  "Complete",
+  "Partially Refunded",
+  "Refunded",
+  "Cancelled",
+  "Disputed",
+  "Failed",
+  "Checking out",
+  "Abandoned",
+  "Archived",
+]
+
+/** Filter options that stay hidden until explicitly checked. */
+export { OPT_IN_ORDER_STATUS_FILTERS }
 
 interface OrdersToolbarProps {
   orders: OrderView[]
@@ -77,6 +97,11 @@ const UNIVERSAL_META_KEYS = new Set([
   "status_override",
   "shipped_at",
   "outstanding_invoice",
+  "outstanding_delta",
+  "original_lines",
+  "original_subtotal",
+  "edited_at",
+  "archived",
 ])
 
 type SuggestionType = "product" | "customer" | "meta"
@@ -168,7 +193,7 @@ function buildSuggestions(
 
 function activeFilterCount(f: OrderFilters): number {
   return [
-    f.status,
+    f.statuses && f.statuses.length > 0,
     f.dateFrom,
     f.dateTo,
     f.totalMin,
@@ -279,6 +304,10 @@ export function OrdersToolbar({
           <SelectItem value="shipped_desc">Recently shipped</SelectItem>
           <SelectItem value="total_desc">Total: high to low</SelectItem>
           <SelectItem value="total_asc">Total: low to high</SelectItem>
+          <SelectItem value="customer_asc">Customer: A to Z</SelectItem>
+          <SelectItem value="customer_desc">Customer: Z to A</SelectItem>
+          <SelectItem value="items_desc">Items: most first</SelectItem>
+          <SelectItem value="items_asc">Items: fewest first</SelectItem>
         </SelectContent>
       </Select>
 
@@ -297,33 +326,47 @@ export function OrdersToolbar({
         <PopoverContent align="end" className="w-80 space-y-4">
           {/* Status */}
           <div className="space-y-1.5">
-            <Label>Status</Label>
-            <Select
-              value={filters.status ?? ""}
-              onValueChange={(v) =>
-                onFiltersChange({
-                  ...filters,
-                  status: (v || undefined) as OrderStatus | undefined,
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Any status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Any</SelectItem>
-                <SelectItem value="Paid">Paid</SelectItem>
-                <SelectItem value="Shipped">Shipped</SelectItem>
-                <SelectItem value="Complete">Complete</SelectItem>
-                <SelectItem value="Partially Refunded">
-                  Partially Refunded
-                </SelectItem>
-                <SelectItem value="Refunded">Refunded</SelectItem>
-                <SelectItem value="Cancelled">Cancelled</SelectItem>
-                <SelectItem value="Disputed">Disputed</SelectItem>
-                <SelectItem value="Failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center justify-between">
+              <Label>Status</Label>
+              {filters.statuses && filters.statuses.length > 0 && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() =>
+                    onFiltersChange({ ...filters, statuses: undefined })
+                  }
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto">
+              {ORDER_STATUS_OPTIONS.map((status) => {
+                const checked = filters.statuses?.includes(status) ?? false
+                return (
+                  <label
+                    key={status}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 text-sm hover:bg-accent"
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(value) => {
+                        const current = filters.statuses ?? []
+                        const next =
+                          value === true
+                            ? [...current, status]
+                            : current.filter((s) => s !== status)
+                        onFiltersChange({
+                          ...filters,
+                          statuses: next.length > 0 ? next : undefined,
+                        })
+                      }}
+                    />
+                    <span>{status}</span>
+                  </label>
+                )
+              })}
+            </div>
           </div>
 
           {/* Date range */}

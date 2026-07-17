@@ -1,4 +1,8 @@
-import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb"
+import {
+  DeleteCommand,
+  ScanCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb"
 
 import { getDynamo } from "@/lib/aws/dynamo"
 import { SUBMISSIONS_TABLE } from "@/lib/cms/constants"
@@ -170,6 +174,31 @@ export async function bulkUpdateSubmissionStatus(
     items.map((item) =>
       updateSubmissionStatus(item.submissionId, item.timestamp, status)
     )
+  )
+}
+
+export async function deleteSubmission(
+  submissionId: string,
+  timestamp: string
+): Promise<void> {
+  const clientId = await getActiveClientId()
+  await getDynamo().send(
+    new DeleteCommand({
+      TableName: SUBMISSIONS_TABLE,
+      Key: { id: submissionId, timestamp },
+      ConditionExpression: "client_id = :cid",
+      ExpressionAttributeValues: {
+        ":cid": clientId,
+      },
+    })
+  )
+}
+
+export async function bulkDeleteSubmissions(
+  items: Array<{ submissionId: string; timestamp: string }>
+): Promise<void> {
+  await Promise.all(
+    items.map((item) => deleteSubmission(item.submissionId, item.timestamp))
   )
 }
 
