@@ -9,10 +9,18 @@ import type {
 } from "@/lib/analytics/types"
 import { cn } from "@/lib/utils"
 
-import { WIDGET_TITLES } from "./analytics-help-data"
+import {
+  WIDGET_TABLE_NAME_LABELS,
+  WIDGET_TITLES,
+} from "./analytics-help-data"
 import { AnalyticsAreaChart } from "./chart-area"
+import {
+  userFacingTrackingReason,
+  widgetAnchorId,
+} from "./education-actions"
 import { HelpPopover } from "./help-popover"
 import { KpiCard } from "./kpi-card"
+import { SourceVisitorTable } from "./source-visitor-table"
 import { RankedTable } from "./table-ranked"
 import { WidgetEmpty, WidgetError, WidgetSkeleton } from "./widget-states"
 
@@ -41,6 +49,7 @@ const WIDGET_CLICK_DIMENSION: Partial<
   utm_source: "utm_source",
   utm_medium: "utm_medium",
   utm_campaign: "utm_campaign",
+  new_returning_by_source: "source",
 }
 
 // ─── Widget preference map ─────────────────────────────────────────────────────
@@ -77,16 +86,27 @@ function WidgetCard({
   id,
   children,
   className,
+  highlighted,
 }: {
   id: AnalyticsWidgetId
   children: React.ReactNode
   className?: string
+  highlighted?: boolean
 }) {
   const title = WIDGET_TITLES[id] ?? id
   const helpId = id
 
   return (
-    <Card className={cn("flex flex-col", className)}>
+    <Card
+      id={widgetAnchorId(id)}
+      data-analytics-widget={id}
+      tabIndex={-1}
+      className={cn(
+        "flex flex-col outline-none transition-shadow duration-300",
+        highlighted && "ring-2 ring-primary shadow-md",
+        className
+      )}
+    >
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
           {title}
@@ -110,6 +130,7 @@ interface WidgetRendererProps {
     value: string
   ) => void
   className?: string
+  highlighted?: boolean
 }
 
 /**
@@ -123,6 +144,7 @@ export function WidgetRenderer({
   filters,
   onFilterAdd,
   className,
+  highlighted,
 }: WidgetRendererProps) {
   const title = WIDGET_TITLES[id] ?? id
 
@@ -131,11 +153,22 @@ export function WidgetRenderer({
     const variant =
       id === "visitors_over_time"
         ? "chart"
-        : id === "top_pages" || id === "traffic_sources"
+        : id === "top_pages" ||
+            id === "traffic_sources" ||
+            id === "new_returning_by_source"
           ? "table"
           : "kpi"
     return (
-      <Card className={cn("flex flex-col", className)}>
+      <Card
+        id={widgetAnchorId(id)}
+        data-analytics-widget={id}
+        tabIndex={-1}
+        className={cn(
+          "flex flex-col outline-none transition-shadow duration-300",
+          highlighted && "ring-2 ring-primary shadow-md",
+          className
+        )}
+      >
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {title}
@@ -151,8 +184,10 @@ export function WidgetRenderer({
   // ── Error ──
   if (result && !result.ok) {
     return (
-      <WidgetCard id={id} className={className}>
-        <WidgetError message={result.error.message} />
+      <WidgetCard id={id} className={className} highlighted={highlighted}>
+        <WidgetError
+          message={userFacingTrackingReason(result.error.message)}
+        />
       </WidgetCard>
     )
   }
@@ -160,7 +195,7 @@ export function WidgetRenderer({
   // ── No result yet ──
   if (!result) {
     return (
-      <WidgetCard id={id} className={className}>
+      <WidgetCard id={id} className={className} highlighted={highlighted}>
         <WidgetEmpty />
       </WidgetCard>
     )
@@ -169,25 +204,36 @@ export function WidgetRenderer({
   const data = result.data
   const showComparison = filters.comparisonRange !== null
   const clickDimension = WIDGET_CLICK_DIMENSION[id]
+  const nameColumnLabel = WIDGET_TABLE_NAME_LABELS[id] ?? "Item"
 
   // ── KPI ──
   if (data.kind === "kpi") {
     return (
-      <KpiCard
-        title={title}
-        helpId={id}
-        metric={data.metric}
-        unit={data.unit ?? WIDGET_UNIT[id] ?? "count"}
-        preference={WIDGET_PREFERENCE[id] ?? "higher"}
-        className={className}
-      />
+      <div
+        id={widgetAnchorId(id)}
+        data-analytics-widget={id}
+        tabIndex={-1}
+        className={cn(
+          "outline-none transition-shadow duration-300 rounded-xl",
+          highlighted && "ring-2 ring-primary shadow-md"
+        )}
+      >
+        <KpiCard
+          title={title}
+          helpId={id}
+          metric={data.metric}
+          unit={data.unit ?? WIDGET_UNIT[id] ?? "count"}
+          preference={WIDGET_PREFERENCE[id] ?? "higher"}
+          className={className}
+        />
+      </div>
     )
   }
 
   // ── Timeseries ──
   if (data.kind === "timeseries") {
     return (
-      <WidgetCard id={id} className={className}>
+      <WidgetCard id={id} className={className} highlighted={highlighted}>
         <AnalyticsAreaChart
           series={data.series}
           granularity={filters.granularity}
@@ -202,7 +248,7 @@ export function WidgetRenderer({
   // ── Table ──
   if (data.kind === "table") {
     return (
-      <WidgetCard id={id} className={className}>
+      <WidgetCard id={id} className={className} highlighted={highlighted}>
         <RankedTable
           rows={data.rows}
           total={data.total}
@@ -214,6 +260,21 @@ export function WidgetRenderer({
           }
           showComparison={showComparison}
           maxRows={10}
+          nameColumnLabel={nameColumnLabel}
+        />
+      </WidgetCard>
+    )
+  }
+
+  // ── Source × new/returning breakdown ──
+  if (data.kind === "source_visitor_breakdown") {
+    return (
+      <WidgetCard id={id} className={className} highlighted={highlighted}>
+        <SourceVisitorTable
+          rows={data.rows}
+          total={data.total}
+          onSourceClick={(sourceKey) => onFilterAdd("source", sourceKey)}
+          maxRows={15}
         />
       </WidgetCard>
     )
@@ -222,7 +283,7 @@ export function WidgetRenderer({
   // ── Empty ──
   if (data.kind === "empty") {
     return (
-      <WidgetCard id={id} className={className}>
+      <WidgetCard id={id} className={className} highlighted={highlighted}>
         <WidgetEmpty reason={data.reason} />
       </WidgetCard>
     )
@@ -230,7 +291,7 @@ export function WidgetRenderer({
 
   // ── Live / map (not default widgets, future) ──
   return (
-    <WidgetCard id={id} className={className}>
+    <WidgetCard id={id} className={className} highlighted={highlighted}>
       <WidgetEmpty reason="This widget type is not yet supported in this view." />
     </WidgetCard>
   )

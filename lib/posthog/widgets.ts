@@ -13,6 +13,7 @@ import type {
   WidgetResultEntry,
   WidgetResultPayload,
 } from "@/lib/analytics/types"
+import { userFacingAnalyticsMessage } from "@/lib/analytics/user-facing"
 import type { PostHogCredentials } from "@/lib/posthog/config"
 import {
   asNumber,
@@ -30,6 +31,12 @@ import {
   whereAnd,
   type HogQLFragment,
 } from "@/lib/posthog/hogql"
+import {
+  NEW_RETURNING_BY_SOURCE_WIDGET_ID,
+  buildNewReturningBySourceQuery,
+  parseSourceVisitorBreakdownRows,
+  sourceVisitorBreakdownTotal,
+} from "@/lib/posthog/source-visitor-breakdown"
 
 const TABLE_LIMIT = 50
 
@@ -52,7 +59,7 @@ const NEEDS_TRACKING: Partial<Record<AnalyticsWidgetId, string>> = {
   timezones: "Visitor timezone capture is not configured yet.",
   browser_versions: "Browser version breakdown is not enabled yet.",
   os_versions: "OS version breakdown is not enabled yet.",
-  goal_completions: "Define goals or conversion events in PostHog first.",
+  goal_completions: "Define goals or conversion events before tracking completions.",
   conversion_rate: "Define conversion goals before measuring rate.",
   conversion_trend: "Define conversion goals before measuring trend.",
   funnels: "Funnels require a configured multi-step conversion path.",
@@ -77,7 +84,11 @@ function fail(
   return {
     widgetId,
     ok: false,
-    error: { widgetId, code, message },
+    error: {
+      widgetId,
+      code,
+      message: userFacingAnalyticsMessage(message),
+    },
   }
 }
 
@@ -138,13 +149,14 @@ async function queryRows(
   })
   if (!result.ok) {
     const detail = result.detail?.trim()
+    const combined =
+      detail && detail.length > 0
+        ? `${result.message} ${detail.slice(0, 240)}`
+        : result.message
     return {
       ok: false,
       code: result.code,
-      message:
-        detail && detail.length > 0
-          ? `${result.message} ${detail.slice(0, 240)}`
-          : result.message,
+      message: userFacingAnalyticsMessage(combined),
     }
   }
   return { ok: true, results: result.results }
@@ -599,6 +611,38 @@ async function customEvents(
   })
 }
 
+async function newReturningBySource(
+  credentials: PostHogCredentials,
+  filters: AnalyticsGlobalFilters,
+  signal?: AbortSignal
+): Promise<WidgetResultEntry> {
+  const widgetId = NEW_RETURNING_BY_SOURCE_WIDGET_ID
+  const query = buildNewReturningBySourceQuery(filters, { limit: TABLE_LIMIT })
+  const result = await queryRows(
+    credentials,
+    "ampere_new_returning_by_source",
+    query.sql,
+    query.values,
+    signal
+  )
+  if (!result.ok) return fail(widgetId, result.code, result.message)
+
+  const rows = parseSourceVisitorBreakdownRows(result.results)
+  if (rows.length === 0) {
+    return empty(widgetId, "No visitor source data for this period.")
+  }
+
+  return ok(
+    widgetId,
+    {
+      kind: "source_visitor_breakdown",
+      rows,
+      total: sourceVisitorBreakdownTotal(rows),
+    },
+    ["visitors", "new_vs_returning", "traffic_sources"]
+  )
+}
+
 async function geoMap(
   credentials: PostHogCredentials,
   filters: AnalyticsGlobalFilters,
@@ -755,6 +799,7 @@ const RUNNERS: Partial<Record<AnalyticsWidgetId, WidgetRunner>> = {
       { context: "events", expr: "properties.$utm_term" },
       s
     ),
+  new_returning_by_source: (c, f, s) => newReturningBySource(c, f, s),
   countries: (c, f, s) =>
     rankedBreakdown(
       c,

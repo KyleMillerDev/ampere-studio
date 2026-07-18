@@ -31,6 +31,14 @@ describe("analytics filter and layout validation", () => {
     expect(parsed.success).toBe(true)
   })
 
+  it("accepts the new_returning_by_source widget id", () => {
+    const parsed = analyticsDashboardRequestSchema.safeParse({
+      widgetIds: ["new_returning_by_source"],
+      filters: validFilters,
+    })
+    expect(parsed.success).toBe(true)
+  })
+
   it("rejects unknown dimensions, operators, and widget ids", () => {
     expect(
       analyticsFilterClauseSchema.safeParse({

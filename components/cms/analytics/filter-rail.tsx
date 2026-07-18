@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/popover"
 import type {
   AnalyticsFilterClause,
+  AnalyticsFilterDimension,
   AnalyticsGlobalFilters,
   AnalyticsGranularity,
 } from "@/lib/analytics/types"
@@ -34,11 +35,22 @@ import {
 } from "./analytics-filter-utils"
 import { FilterClauseBuilder } from "./filter-clause-builder"
 
+/** Request from education actions to open the filter builder prefilled. */
+export interface FilterBuilderRequest {
+  dimension: AnalyticsFilterDimension
+  values?: string[]
+  /** Bump to re-open even when dimension/values are unchanged. */
+  token: number
+}
+
 interface FilterRailProps {
   filters: AnalyticsGlobalFilters
   loading: boolean
   onFiltersChange: (next: AnalyticsGlobalFilters) => void
   onRefresh: () => void
+  /** When set/updated, opens the Add filter popover with a preselected dimension. */
+  filterBuilderRequest?: FilterBuilderRequest | null
+  onFilterBuilderRequestHandled?: () => void
 }
 
 // ─── Granularity toggle segment ────────────────────────────────────────────────
@@ -253,14 +265,37 @@ function CompareToggle({
 function AddFilterButton({
   filters,
   onClauseAdd,
+  filterBuilderRequest,
+  onFilterBuilderRequestHandled,
 }: {
   filters: AnalyticsGlobalFilters
   onClauseAdd: (clause: AnalyticsFilterClause) => void
+  filterBuilderRequest?: FilterBuilderRequest | null
+  onFilterBuilderRequestHandled?: () => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [userOpen, setUserOpen] = useState(false)
+  const requestActive = filterBuilderRequest != null
+  const open = userOpen || requestActive
+  const prefillDimension = filterBuilderRequest?.dimension ?? "page"
+  const prefillValues = filterBuilderRequest?.values
+  const builderKey = filterBuilderRequest?.token ?? 0
+
+  function closeBuilder() {
+    setUserOpen(false)
+    if (requestActive) onFilterBuilderRequestHandled?.()
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          setUserOpen(true)
+          return
+        }
+        closeBuilder()
+      }}
+    >
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="h-9 gap-1.5 text-sm">
           <FilterIcon className="size-3.5" />
@@ -270,12 +305,15 @@ function AddFilterButton({
       </PopoverTrigger>
       <PopoverContent className="w-96 p-0" align="start" sideOffset={6}>
         <FilterClauseBuilder
+          key={builderKey}
           filters={filters}
+          initialDimension={prefillDimension}
+          initialValues={prefillValues}
           onAdd={(clause) => {
             onClauseAdd(clause)
-            setOpen(false)
+            closeBuilder()
           }}
-          onCancel={() => setOpen(false)}
+          onCancel={closeBuilder}
         />
       </PopoverContent>
     </Popover>
@@ -289,6 +327,8 @@ export function FilterRail({
   loading,
   onFiltersChange,
   onRefresh,
+  filterBuilderRequest,
+  onFilterBuilderRequestHandled,
 }: FilterRailProps) {
   function handleGranularity(gran: AnalyticsGranularity) {
     onFiltersChange({ ...filters, granularity: gran })
@@ -309,7 +349,12 @@ export function FilterRail({
 
       <CompareToggle filters={filters} onFiltersChange={onFiltersChange} />
 
-      <AddFilterButton filters={filters} onClauseAdd={handleClauseAdd} />
+      <AddFilterButton
+        filters={filters}
+        onClauseAdd={handleClauseAdd}
+        filterBuilderRequest={filterBuilderRequest}
+        onFilterBuilderRequestHandled={onFilterBuilderRequestHandled}
+      />
 
       <Button
         variant="outline"

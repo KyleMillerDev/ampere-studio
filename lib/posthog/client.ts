@@ -64,7 +64,7 @@ function mapHttpFailure(
     return {
       ok: false,
       code: "invalid_credentials",
-      message: "PostHog rejected the personal API key.",
+      message: "Analytics rejected the configured API key.",
       httpStatus,
       detail,
     }
@@ -79,8 +79,8 @@ function mapHttpFailure(
       ok: false,
       code: scopeBlocked ? "insufficient_scope" : "invalid_credentials",
       message: scopeBlocked
-        ? "PostHog personal API key is missing the query:read scope."
-        : "PostHog denied access to this project.",
+        ? "Analytics API key is missing the query:read scope."
+        : "Analytics denied access to this project.",
       httpStatus,
       detail,
     }
@@ -89,7 +89,7 @@ function mapHttpFailure(
     return {
       ok: false,
       code: "rate_limited",
-      message: "PostHog rate-limited this query.",
+      message: "Analytics rate-limited this query.",
       httpStatus,
       detail,
     }
@@ -97,7 +97,7 @@ function mapHttpFailure(
   return {
     ok: false,
     code: "query_failed",
-    message: `PostHog query failed with HTTP ${httpStatus}.`,
+    message: `Analytics query failed with HTTP ${httpStatus}.`,
     httpStatus,
     detail,
   }
@@ -140,7 +140,7 @@ export async function runHogQL(
     return {
       ok: false,
       code: "query_failed",
-      message: "Could not reach PostHog.",
+      message: "Could not reach analytics.",
       detail: err instanceof Error ? err.message : String(err),
     }
   }
@@ -167,7 +167,7 @@ export async function runHogQL(
     return {
       ok: false,
       code: "query_failed",
-      message: "PostHog returned an unreadable query response.",
+      message: "Analytics returned an unreadable query response.",
     }
   }
 }

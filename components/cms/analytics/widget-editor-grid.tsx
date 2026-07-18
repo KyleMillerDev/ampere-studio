@@ -99,6 +99,7 @@ interface WidgetEditorGridProps {
   onFilterAdd: (dimension: AnalyticsFilterDimension, value: string) => void
   onLayoutChange: (widgetIds: AnalyticsWidgetId[], layouts: AnalyticsResponsiveLayouts) => void
   onRemoveWidget: (id: AnalyticsWidgetId) => void
+  highlightWidgetId?: AnalyticsWidgetId | null
 }
 
 export function WidgetEditorGrid({
@@ -110,6 +111,7 @@ export function WidgetEditorGrid({
   onFilterAdd,
   onLayoutChange,
   onRemoveWidget,
+  highlightWidgetId,
 }: WidgetEditorGridProps) {
   const [isMobile, setIsMobile] = useState(false)
 
@@ -197,6 +199,7 @@ export function WidgetEditorGrid({
         onMoveUp={handleMoveUp}
         onMoveDown={handleMoveDown}
         onRemove={onRemoveWidget}
+        highlightWidgetId={highlightWidgetId}
       />
     )
   }
@@ -212,6 +215,7 @@ export function WidgetEditorGrid({
       onDesktopLayoutChange={handleDesktopLayoutChange}
       onResizePreset={handleResizePreset}
       onRemove={onRemoveWidget}
+      highlightWidgetId={highlightWidgetId}
     />
   )
 }
@@ -228,6 +232,7 @@ interface DesktopEditorGridProps {
   onDesktopLayoutChange: (layout: readonly LayoutItem[]) => void
   onResizePreset: (id: AnalyticsWidgetId, w: number) => void
   onRemove: (id: AnalyticsWidgetId) => void
+  highlightWidgetId?: AnalyticsWidgetId | null
 }
 
 function DesktopEditorGrid({
@@ -240,6 +245,7 @@ function DesktopEditorGrid({
   onDesktopLayoutChange,
   onResizePreset,
   onRemove,
+  highlightWidgetId,
 }: DesktopEditorGridProps) {
   const { width, containerRef, mounted } = useContainerWidth({
     initialWidth: 1200,
@@ -289,6 +295,7 @@ function DesktopEditorGrid({
                     onFilterAdd={onFilterAdd}
                     onResizePreset={onResizePreset}
                     onRemove={onRemove}
+                    highlighted={highlightWidgetId === id}
                   />
                 </div>
               )
@@ -311,6 +318,7 @@ interface EditableCardProps {
   onFilterAdd: (dimension: AnalyticsFilterDimension, value: string) => void
   onResizePreset: (id: AnalyticsWidgetId, w: number) => void
   onRemove: (id: AnalyticsWidgetId) => void
+  highlighted?: boolean
 }
 
 function EditableCard({
@@ -322,6 +330,7 @@ function EditableCard({
   onFilterAdd,
   onResizePreset,
   onRemove,
+  highlighted,
 }: EditableCardProps) {
   return (
     <div className="group relative h-full select-none">
@@ -372,6 +381,7 @@ function EditableCard({
           filters={filters}
           onFilterAdd={onFilterAdd}
           className="h-full"
+          highlighted={highlighted}
         />
       </div>
     </div>
@@ -389,6 +399,7 @@ interface MobileEditorListProps {
   onMoveUp: (id: AnalyticsWidgetId) => void
   onMoveDown: (id: AnalyticsWidgetId) => void
   onRemove: (id: AnalyticsWidgetId) => void
+  highlightWidgetId?: AnalyticsWidgetId | null
 }
 
 function MobileEditorList({
@@ -400,6 +411,7 @@ function MobileEditorList({
   onMoveUp,
   onMoveDown,
   onRemove,
+  highlightWidgetId,
 }: MobileEditorListProps) {
   return (
     <div className="flex flex-col gap-3">
@@ -447,6 +459,7 @@ function MobileEditorList({
             filters={filters}
             onFilterAdd={onFilterAdd}
             className="pt-2"
+            highlighted={highlightWidgetId === id}
           />
         </div>
       ))}

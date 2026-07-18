@@ -62,18 +62,26 @@ interface FilterClauseBuilderProps {
   filters: AnalyticsGlobalFilters
   onAdd: (clause: AnalyticsFilterClause) => void
   onCancel: () => void
+  /** Preselect a dimension when opened from an education action. */
+  initialDimension?: AnalyticsFilterDimension
+  /** Prefill selected values (still editable before Apply). */
+  initialValues?: string[]
 }
 
 export function FilterClauseBuilder({
   filters,
   onAdd,
   onCancel,
+  initialDimension = "page",
+  initialValues,
 }: FilterClauseBuilderProps) {
   const [dimension, setDimension] =
-    useState<AnalyticsFilterDimension>("page")
+    useState<AnalyticsFilterDimension>(initialDimension)
   const [operator, setOperator] = useState<AnalyticsFilterOperator>("is")
   const [search, setSearch] = useState("")
-  const [selectedValues, setSelectedValues] = useState<string[]>([])
+  const [selectedValues, setSelectedValues] = useState<string[]>(
+    () => initialValues?.slice() ?? []
+  )
   const [manualInput, setManualInput] = useState("")
 
   function changeDimension(next: AnalyticsFilterDimension) {

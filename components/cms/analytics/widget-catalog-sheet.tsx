@@ -30,6 +30,9 @@ import {
   type CatalogWidget,
 } from "@/lib/analytics/widget-catalog"
 
+import { WIDGET_TITLES } from "./analytics-help-data"
+import { userFacingTrackingReason } from "./education-actions"
+
 interface WidgetCatalogSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -48,12 +51,15 @@ export function WidgetCatalogSheet({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return WIDGET_CATALOG
-    return WIDGET_CATALOG.filter(
-      (w) =>
+    return WIDGET_CATALOG.filter((w) => {
+      const title = (WIDGET_TITLES[w.id] ?? w.title).toLowerCase()
+      return (
+        title.includes(q) ||
         w.title.toLowerCase().includes(q) ||
         w.description.toLowerCase().includes(q) ||
         w.category.toLowerCase().includes(q)
-    )
+      )
+    })
   }, [search])
 
   const activeSet = useMemo(() => new Set(activeWidgetIds), [activeWidgetIds])
@@ -149,6 +155,11 @@ function CatalogRow({ widget, isActive, onAdd }: CatalogRowProps) {
   const isDisabled =
     isActive || widget.availability.status === "needs_tracking"
   const needsTracking = widget.availability.status === "needs_tracking"
+  const title = WIDGET_TITLES[widget.id] ?? widget.title
+  const trackingReason =
+    needsTracking && widget.availability.status === "needs_tracking"
+      ? userFacingTrackingReason(widget.availability.reason)
+      : null
 
   return (
     <div
@@ -173,7 +184,7 @@ function CatalogRow({ widget, isActive, onAdd }: CatalogRowProps) {
       {/* Text */}
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium leading-none">{widget.title}</span>
+          <span className="text-sm font-medium leading-none">{title}</span>
           {isActive && (
             <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
               Added
@@ -181,9 +192,9 @@ function CatalogRow({ widget, isActive, onAdd }: CatalogRowProps) {
           )}
         </div>
         <p className="text-xs text-muted-foreground">{widget.description}</p>
-        {needsTracking && (
+        {trackingReason && (
           <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
-            {(widget.availability as { status: "needs_tracking"; reason: string }).reason}
+            {trackingReason}
           </p>
         )}
       </div>
@@ -198,7 +209,7 @@ function CatalogRow({ widget, isActive, onAdd }: CatalogRowProps) {
             e.stopPropagation()
             onAdd(widget.id)
           }}
-          aria-label={`Add ${widget.title}`}
+          aria-label={`Add ${title}`}
         >
           <PlusIcon className="size-3.5" />
         </Button>

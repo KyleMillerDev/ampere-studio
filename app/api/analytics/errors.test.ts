@@ -28,14 +28,15 @@ describe("analytics API error mapping", () => {
     }
   })
 
-  it("redacts personal PostHog keys from response bodies", async () => {
+  it("redacts personal API keys and provider names from response bodies", async () => {
     const res = analyticsErrorResponse(
       "unknown",
-      "Bearer phx_abc123XYZ leaked into logs"
+      "Bearer phx_abc123XYZ leaked into PostHog logs"
     )
     const body = await res.json()
-    expect(body.error).toBe("Bearer [redacted] leaked into logs")
+    expect(body.error).toBe("Bearer [redacted] leaked into Ampere Sites logs")
     expect(JSON.stringify(body)).not.toMatch(/phx_[A-Za-z0-9]+/)
+    expect(JSON.stringify(body)).not.toMatch(/PostHog/i)
   })
 
   it("maps Zod and unknown errors safely", async () => {

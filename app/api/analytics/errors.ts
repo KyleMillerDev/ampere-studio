@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { ZodError } from "zod"
 
 import type { AnalyticsErrorCode } from "@/lib/analytics/types"
+import { userFacingAnalyticsMessage } from "@/lib/analytics/user-facing"
 
 export function analyticsErrorResponse(
   code: AnalyticsErrorCode,
@@ -24,8 +25,8 @@ export function analyticsErrorResponse(
                 ? 502
                 : 500)
 
-  // Never include personal API keys in responses.
-  const safeMessage = message.replace(/phx_[A-Za-z0-9]+/g, "[redacted]")
+  // Never include personal API keys or provider names in client responses.
+  const safeMessage = userFacingAnalyticsMessage(message)
 
   return NextResponse.json(
     { error: safeMessage, code },
@@ -45,9 +46,5 @@ export function analyticsUnknownErrorResponse(err: unknown): NextResponse {
   if (err instanceof ZodError) return analyticsZodErrorResponse(err)
   const message =
     err instanceof Error ? err.message : "Unexpected analytics error."
-  return analyticsErrorResponse(
-    "unknown",
-    message.replace(/phx_[A-Za-z0-9]+/g, "[redacted]"),
-    500
-  )
+  return analyticsErrorResponse("unknown", message, 500)
 }

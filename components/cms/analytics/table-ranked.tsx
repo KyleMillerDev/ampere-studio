@@ -27,6 +27,16 @@ interface RankedTableProps {
   maxRows?: number
   emptyMessage?: string
   className?: string
+  /**
+   * Label for the name column. Defaults to a generic label.
+   * Pass a context-specific label such as "Page", "Source", or "Country"
+   * so the column header makes sense without requiring the help button.
+   */
+  nameColumnLabel?: string
+  /**
+   * Label for the value column. Defaults to "Visitors".
+   */
+  valueColumnLabel?: string
 }
 
 /**
@@ -43,6 +53,8 @@ export function RankedTable({
   maxRows = 10,
   emptyMessage = "No data for this period.",
   className,
+  nameColumnLabel = "Item",
+  valueColumnLabel = "Visitors",
 }: RankedTableProps) {
   const visible = rows.slice(0, maxRows)
   const maxValue = visible.reduce((m, r) => Math.max(m, r.value), 0)
@@ -61,10 +73,10 @@ export function RankedTable({
     <div className={cn("", className)}>
       {/* Column headers */}
       <div className="mb-1 flex items-center justify-between px-2 text-xs font-medium text-muted-foreground">
-        <span>Page / Source</span>
+        <span>{nameColumnLabel}</span>
         <div className="flex items-center gap-4">
           {showComparison && <span className="w-16 text-right">Prior</span>}
-          <span className="w-16 text-right">Visitors</span>
+          <span className="w-16 text-right">{valueColumnLabel}</span>
         </div>
       </div>
 
@@ -147,7 +159,7 @@ export function RankedTable({
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          —
+                          -
                         </span>
                       )}
                     </span>

@@ -28,7 +28,7 @@ export const WIDGET_NEEDS_TRACKING: Partial<Record<AnalyticsWidgetId, string>> =
     timezones: "Visitor timezone capture is not configured yet.",
     browser_versions: "Browser version breakdown is not enabled yet.",
     os_versions: "OS version breakdown is not enabled yet.",
-    goal_completions: "Define goals or conversion events in PostHog first.",
+    goal_completions: "Define goals or conversion events before tracking completions.",
     conversion_rate: "Define conversion goals before measuring rate.",
     conversion_trend: "Define conversion goals before measuring trend.",
     funnels: "Funnels require a configured multi-step conversion path.",
@@ -70,7 +70,7 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
   },
   {
     id: "pageviews",
-    title: "Pageviews",
+    title: "Page views",
     description: "Total page loads in the selected period.",
     category: "default",
     availability: avail("pageviews"),
@@ -79,7 +79,7 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
   {
     id: "bounce_rate",
     title: "Bounce rate",
-    description: "Sessions with a single pageview and no interaction.",
+    description: "Visits with a single page view and no interaction.",
     category: "default",
     availability: avail("bounce_rate"),
     defaultSize: { w: 4, h: 2 },
@@ -102,7 +102,7 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
   },
   {
     id: "traffic_sources",
-    title: "Traffic sources",
+    title: "How people found your site",
     description: "Where your visitors came from.",
     category: "default",
     availability: avail("traffic_sources"),
@@ -112,7 +112,7 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
   // Audience
   {
     id: "sessions",
-    title: "Sessions",
+    title: "Visits",
     description: "Total visits including repeat visits from the same person.",
     category: "audience",
     availability: avail("sessions"),
@@ -128,7 +128,7 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
   },
   {
     id: "session_duration",
-    title: "Session duration",
+    title: "Time per visit",
     description: "Average time visitors spend per visit.",
     category: "audience",
     availability: avail("session_duration"),
@@ -136,7 +136,7 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
   },
   {
     id: "pages_per_session",
-    title: "Pages per session",
+    title: "Pages per visit",
     description: "Average number of pages viewed each visit.",
     category: "audience",
     availability: avail("pages_per_session"),
@@ -186,7 +186,7 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
   // Content
   {
     id: "entry_pages",
-    title: "Entry pages",
+    title: "First pages people saw",
     description: "First pages visitors land on when they arrive.",
     category: "content",
     availability: avail("entry_pages"),
@@ -194,7 +194,7 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
   },
   {
     id: "exit_pages",
-    title: "Exit pages",
+    title: "Last pages people saw",
     description: "Last pages visitors were on before leaving.",
     category: "content",
     availability: avail("exit_pages"),
@@ -260,7 +260,7 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
   // Acquisition
   {
     id: "referrers",
-    title: "Referrers",
+    title: "Websites that sent visitors",
     description: "Sites that sent visitors to yours.",
     category: "acquisition",
     availability: avail("referrers"),
@@ -276,40 +276,40 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
   },
   {
     id: "utm_source",
-    title: "UTM source",
-    description: "Traffic broken down by utm_source parameter.",
+    title: "Campaign source",
+    description: "Traffic broken down by campaign source labels on your links.",
     category: "acquisition",
     availability: avail("utm_source"),
     defaultSize: { w: 4, h: 4 },
   },
   {
     id: "utm_medium",
-    title: "UTM medium",
-    description: "Traffic broken down by utm_medium parameter.",
+    title: "Campaign medium",
+    description: "Traffic broken down by campaign medium labels on your links.",
     category: "acquisition",
     availability: avail("utm_medium"),
     defaultSize: { w: 4, h: 4 },
   },
   {
     id: "utm_campaign",
-    title: "UTM campaign",
-    description: "Traffic broken down by utm_campaign parameter.",
+    title: "Campaign name",
+    description: "Traffic broken down by campaign name labels on your links.",
     category: "acquisition",
     availability: avail("utm_campaign"),
     defaultSize: { w: 4, h: 4 },
   },
   {
     id: "utm_content",
-    title: "UTM content",
-    description: "Traffic broken down by utm_content parameter.",
+    title: "Campaign content",
+    description: "Traffic broken down by campaign content labels on your links.",
     category: "acquisition",
     availability: avail("utm_content"),
     defaultSize: { w: 4, h: 4 },
   },
   {
     id: "utm_term",
-    title: "UTM term",
-    description: "Traffic broken down by utm_term parameter.",
+    title: "Campaign keyword",
+    description: "Traffic broken down by campaign keyword labels on your links.",
     category: "acquisition",
     availability: avail("utm_term"),
     defaultSize: { w: 4, h: 4 },
@@ -328,6 +328,15 @@ export const WIDGET_CATALOG: CatalogWidget[] = [
     description: "Top landing pages broken down by traffic source.",
     category: "acquisition",
     availability: avail("landing_pages_by_source"),
+    defaultSize: { w: 8, h: 4 },
+  },
+  {
+    id: "new_returning_by_source",
+    title: "New and returning by source",
+    description:
+      "Each way people found your site, with separate counts for first-time and repeat visitors.",
+    category: "acquisition",
+    availability: avail("new_returning_by_source"),
     defaultSize: { w: 8, h: 4 },
   },
   {

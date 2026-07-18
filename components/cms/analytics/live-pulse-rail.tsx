@@ -1,5 +1,6 @@
 "use client"
 
+import { liveWidgetAnchorId } from "./education-actions"
 import { HelpPopover } from "./help-popover"
 import { useAnalyticsLive } from "./use-analytics"
 import { cn } from "@/lib/utils"
@@ -53,7 +54,12 @@ export function LivePulseRail({
       )}
     >
       {/* Active visitors */}
-      <div className="flex items-center gap-3">
+      <div
+        id={liveWidgetAnchorId("active_visitors")}
+        data-analytics-widget="active_visitors"
+        tabIndex={-1}
+        className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
         <PulseDot />
         <div>
           <div className="flex items-center gap-1.5">
@@ -76,7 +82,12 @@ export function LivePulseRail({
       <div className="hidden self-stretch w-px bg-border lg:block" />
 
       {/* Active pages */}
-      <div className="min-w-0 flex-1">
+      <div
+        id={liveWidgetAnchorId("active_pages")}
+        data-analytics-widget="active_pages"
+        tabIndex={-1}
+        className="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
         <div className="flex items-center gap-1.5 mb-2">
           <span className="text-xs font-medium text-muted-foreground">
             Viewed right now
@@ -118,7 +129,12 @@ export function LivePulseRail({
       {data?.liveSources && data.liveSources.length > 0 && (
         <>
           <div className="hidden self-stretch w-px bg-border lg:block" />
-          <div className="shrink-0">
+          <div
+            id={liveWidgetAnchorId("live_sources")}
+            data-analytics-widget="live_sources"
+            tabIndex={-1}
+            className="shrink-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
             <div className="flex items-center gap-1.5 mb-2">
               <span className="text-xs font-medium text-muted-foreground">
                 Sources

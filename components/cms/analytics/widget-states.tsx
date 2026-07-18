@@ -132,7 +132,7 @@ export function WidgetEmpty({
 
 // ─── Coming soon card ─────────────────────────────────────────────────────────
 
-/** Shown when PostHog is not configured for the current client. */
+/** Shown when analytics tracking is not yet configured for the current client. */
 export function AnalyticsComingSoonCard() {
   return (
     <Card>
@@ -144,14 +144,14 @@ export function AnalyticsComingSoonCard() {
           <div>
             <p className="font-semibold">Analytics coming soon</p>
             <p className="text-sm text-muted-foreground">
-              Your PostHog project has not been connected yet.
+              Ampere Sites analytics has not been activated for this account yet.
             </p>
           </div>
         </div>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground">
-        Once connected, you will see pageviews, top referrers, and conversion
-        trends right here. Your events are still being captured in the meantime.
+        Once activated, you will see page views, top sources, and conversion
+        trends right here. Reach out to your Ampere contact to get started.
       </CardContent>
     </Card>
   )
@@ -163,9 +163,11 @@ interface ConnectionErrorCardProps {
   message?: string
 }
 
-export function AnalyticsConnectionErrorCard({
-  message,
-}: ConnectionErrorCardProps) {
+export function AnalyticsConnectionErrorCard(
+  // message prop reserved for internal logging; not surfaced to the user.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _props: ConnectionErrorCardProps
+) {
   return (
     <Card className="border-destructive/30">
       <CardHeader>
@@ -174,10 +176,10 @@ export function AnalyticsConnectionErrorCard({
             <WifiOffIcon className="size-4" />
           </span>
           <div>
-            <p className="font-semibold">Could not connect to PostHog</p>
+            <p className="font-semibold">Could not load analytics</p>
             <p className="text-sm text-muted-foreground">
-              {message ??
-                "Check that your project ID and API key are correct."}
+              Analytics data is temporarily unavailable. If this keeps happening,
+              contact your Ampere account manager.
             </p>
           </div>
         </div>

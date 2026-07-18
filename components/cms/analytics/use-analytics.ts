@@ -111,7 +111,7 @@ export function useAnalyticsDashboard(
             status: "connection_error",
             message:
               message ??
-              "Could not connect to PostHog. Check your project credentials.",
+              "Could not load analytics. If this keeps happening, contact your Ampere account manager.",
           })
           return
         }

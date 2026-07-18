@@ -56,6 +56,7 @@ export const ADVANCED_WIDGET_IDS = [
   "utm_term",
   "campaigns",
   "landing_pages_by_source",
+  "new_returning_by_source",
   "paid_vs_organic",
   // Geography
   "countries",
@@ -225,6 +226,49 @@ export interface AnalyticsGlobalFilters {
 
 export type MetricDirectionPreference = "higher" | "lower" | "neutral"
 
+/**
+ * Typed next-step actions for metric help and Analytics 101.
+ * Dispatched by the dashboard education action handler.
+ */
+export type AnalyticsHelpAction =
+  | {
+      kind: "focus_widget"
+      label: string
+      description?: string
+      widgetId: AnalyticsWidgetId
+    }
+  | {
+      kind: "open_filter"
+      label: string
+      description?: string
+      dimension: AnalyticsFilterDimension
+      /** Optional values prefilled in the filter builder. */
+      values?: string[]
+    }
+  | {
+      kind: "apply_filter"
+      label: string
+      description?: string
+      clause: Omit<AnalyticsFilterClause, "id">
+    }
+  | {
+      kind: "open_glossary"
+      label: string
+      description?: string
+      /** Stable glossary term id from Analytics 101. */
+      termId: string
+    }
+  | {
+      kind: "navigate"
+      label: string
+      description?: string
+      /** App-relative path; site editor is `/content`. */
+      href: string
+    }
+
+/** Plain string (legacy) or a typed action object. */
+export type MetricHelpNextStep = string | AnalyticsHelpAction
+
 export interface MetricHelp {
   /** Stable key shared by KPI, column, legend, and chart tooltips. */
   id: string
@@ -238,7 +282,26 @@ export interface MetricHelp {
    */
   referenceRange: string | null
   contextNotes: string
-  nextSteps: [string] | [string, string]
+  /**
+   * One or two next steps. Prefer typed `AnalyticsHelpAction` objects;
+   * plain strings remain accepted for backward compatibility only.
+   */
+  nextSteps: readonly [MetricHelpNextStep] | readonly [MetricHelpNextStep, MetricHelpNextStep]
+  /**
+   * Optional stable ID linking this metric to a term in the Analytics 101
+   * glossary. Help popovers use this for "Learn more in Analytics 101".
+   */
+  glossaryTermId?: string
+}
+
+export function isAnalyticsHelpAction(
+  step: MetricHelpNextStep
+): step is AnalyticsHelpAction {
+  return typeof step === "object" && step !== null && "kind" in step
+}
+
+export function metricHelpStepLabel(step: MetricHelpNextStep): string {
+  return typeof step === "string" ? step : step.label
 }
 
 // ─── Query / dashboard results ───────────────────────────────────────────────
@@ -283,10 +346,29 @@ export interface RankedRow {
   meta?: Record<string, string | number | null>
 }
 
+/**
+ * One acquisition source with new vs returning visitor counts.
+ * See `NEW_VISITOR_DEFINITION` in `lib/posthog/source-visitor-breakdown.ts`.
+ */
+export interface SourceVisitorBreakdownRow {
+  key: string
+  label: string
+  newVisitors: number
+  returningVisitors: number
+  /** newVisitors + returningVisitors for ranking and share. */
+  total: number
+  share?: number
+}
+
 export type WidgetResultPayload =
   | { kind: "kpi"; metric: MetricComparison; unit?: "count" | "percent" | "duration_seconds" | "currency" }
   | { kind: "timeseries"; series: TimeSeriesPoint[]; unit?: "count" | "percent" }
   | { kind: "table"; rows: RankedRow[]; total?: number }
+  | {
+      kind: "source_visitor_breakdown"
+      rows: SourceVisitorBreakdownRow[]
+      total?: number
+    }
   | { kind: "map"; rows: RankedRow[] }
   | { kind: "live"; activeVisitors: number; activePages: RankedRow[]; liveSources: RankedRow[] }
   | { kind: "empty"; reason?: string }
