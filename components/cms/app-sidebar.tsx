@@ -12,7 +12,6 @@ import {
   DollarCircleIcon,
   InboxIcon,
   PencilEdit01Icon,
-  SparklesIcon,
   News01Icon,
   TruckIcon,
   ShoppingCart01Icon,
@@ -203,7 +202,6 @@ function NavGroup({
 }
 
 interface AppSidebarProps {
-  clientName: string
   features: ClientFeatures
   ordersEnabled?: boolean
   squareEnabled?: boolean
@@ -262,7 +260,6 @@ function buildSquareNav(
 }
 
 export function AppSidebar({
-  clientName,
   features,
   ordersEnabled = false,
   squareEnabled = false,
@@ -285,18 +282,26 @@ export function AppSidebar({
   return (
     <Sidebar collapsible="none">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-2">
-          <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <HugeiconsIcon icon={SparklesIcon} className="size-4" />
+        <div className="flex h-8 items-center gap-2 px-2">
+          <span
+            role="img"
+            aria-label="Ampere Studio"
+            className="flex h-full shrink-0 items-center"
+          >
+            <img
+              src="/Lightning Dark Transparent.png"
+              alt=""
+              className="h-full w-auto dark:hidden"
+            />
+            <img
+              src="/Lightning Light Transparent.png"
+              alt=""
+              className="hidden h-full w-auto dark:block"
+            />
           </span>
-          <div className="flex min-w-0 flex-col">
-            <span className="truncate text-sm font-semibold">
-              Ampere Studio
-            </span>
-            <span className="truncate text-xs text-muted-foreground">
-              {clientName}
-            </span>
-          </div>
+          <span className="text-[2rem] leading-none font-black tracking-tight text-foreground">
+            STUDIO
+          </span>
         </div>
       </SidebarHeader>
       <SidebarContent>

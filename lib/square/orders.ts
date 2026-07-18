@@ -2,6 +2,8 @@ import { randomUUID } from "crypto"
 
 import type { Fulfillment } from "square"
 
+import { getActiveClientId } from "@/lib/cms/client-context"
+import { buildVariationProductIndex } from "@/lib/square/catalog-resolve"
 import { requireSquareClient } from "@/lib/square/client"
 import { getSquareTokens } from "@/lib/square/config"
 import {
@@ -9,9 +11,9 @@ import {
   listMirrorOrders,
   putMirrorOrder,
 } from "@/lib/square/mirror"
+import { listSquareProducts } from "@/lib/square/products"
 import { deriveKmOrderState, sdkToSnake } from "@/lib/square/sync"
 import type { KmOrderState, SquareOrder } from "@/lib/square/types"
-import { getActiveClientId } from "@/lib/cms/client-context"
 
 // ─── Read from mirror ─────────────────────────────────────────────────────────
 
@@ -244,7 +246,10 @@ export async function computeDashboardSummary(
         const meta = li as unknown as Record<string, unknown>
         const cats = meta.catalog_object_id ?? ""
         const varMeta = (meta.variation_name ?? "") as string
-        return (varMeta.toLowerCase().includes(lc) || String(cats).toLowerCase().includes(lc))
+        return (
+          varMeta.toLowerCase().includes(lc) ||
+          String(cats).toLowerCase().includes(lc)
+        )
       })
       if (!match) return false
     }
@@ -317,15 +322,19 @@ export async function computeDashboardSummary(
     ordersByMonth.set(monthKey, (ordersByMonth.get(monthKey) ?? 0) + 1)
   }
 
-  // Top products
+  // Top products (resolve variation catalog ids to parent ITEM ids)
+  const variationIndex = buildVariationProductIndex(await listSquareProducts())
+
   const productRevenue = new Map<
     string,
     { name: string; quantity: number; revenue: number }
   >()
   for (const o of completed) {
     for (const li of o.line_items ?? []) {
-      const pid = li.catalog_object_id ?? "unknown"
-      const name = li.name ?? "Unknown Product"
+      const catalogId = li.catalog_object_id
+      const resolved = catalogId ? variationIndex.get(catalogId) : undefined
+      const pid = resolved?.id ?? catalogId ?? "unknown"
+      const name = resolved?.name ?? li.name ?? "Unknown Product"
       const qty = parseInt(li.quantity, 10) || 0
       const rev = li.total_money?.amount ?? 0
       const existing = productRevenue.get(pid) ?? {

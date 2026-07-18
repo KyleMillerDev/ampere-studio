@@ -51,10 +51,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { entityContextTargetClass } from "@/components/cms/entity-row-actions"
 import { RecentSubmissionsPanel } from "@/components/cms/recent-submissions-panel"
 import { FailedPaymentRow } from "@/components/cms/stripe/failed-payment-row"
 import { RecentOrderRow } from "@/components/cms/stripe/recent-order-row"
+import { StripeProductContextMenu } from "@/components/cms/stripe/product-actions"
 import { StripeBalanceSummary } from "@/components/cms/stripe/stripe-balance-summary"
+import { cn } from "@/lib/utils"
 import type { Submission } from "@/lib/cms/submission-types"
 import type { StripeDashboardSummary } from "@/lib/stripe/analytics"
 import type { OrderStatus } from "@/lib/stripe/order-model"
@@ -1616,29 +1619,37 @@ export function StripeSalesOverview({
                   ) : (
                     <div className="space-y-1">
                       {topProducts.map((p, i) => (
-                        <div
+                        <StripeProductContextMenu
                           key={p.id}
-                          className={`flex items-center justify-between rounded-md px-2 py-2 text-sm ${i % 2 === 1 ? "bg-muted" : ""}`}
+                          product={{ id: p.id, name: p.name }}
                         >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span
-                              className={`w-5 shrink-0 text-center text-xs font-bold ${i === 0 ? "text-yellow-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-muted-foreground"}`}
-                            >
-                              {i + 1}
-                            </span>
-                            <span className="truncate">{p.name}</span>
-                            <Badge className="shrink-0 border-transparent bg-primary/15 text-xs font-medium text-primary hover:bg-primary/20">
+                          <div
+                            className={cn(
+                              "flex items-center justify-between rounded-md px-2 py-2 text-sm",
+                              entityContextTargetClass,
+                              i % 2 === 1 && "bg-muted"
+                            )}
+                          >
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span
+                                className={`w-5 shrink-0 text-center text-xs font-bold ${i === 0 ? "text-yellow-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-muted-foreground"}`}
+                              >
+                                {i + 1}
+                              </span>
+                              <span className="truncate">{p.name}</span>
+                              <Badge className="shrink-0 border-transparent bg-primary/15 text-xs font-medium text-primary hover:bg-primary/20">
+                                {topProductsSort === "quantity"
+                                  ? fmt(p.revenue)
+                                  : `${p.quantity} sold`}
+                              </Badge>
+                            </div>
+                            <span className="ml-3 shrink-0 font-medium tabular-nums">
                               {topProductsSort === "quantity"
-                                ? fmt(p.revenue)
-                                : `${p.quantity} sold`}
-                            </Badge>
+                                ? `${p.quantity} sold`
+                                : fmt(p.revenue)}
+                            </span>
                           </div>
-                          <span className="ml-3 shrink-0 font-medium tabular-nums">
-                            {topProductsSort === "quantity"
-                              ? `${p.quantity} sold`
-                              : fmt(p.revenue)}
-                          </span>
-                        </div>
+                        </StripeProductContextMenu>
                       ))}
                     </div>
                   )}

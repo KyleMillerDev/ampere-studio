@@ -1,0 +1,48 @@
+---
+description: Right-click / long-press context menus for all dashboard entity data
+alwaysApply: true
+---
+
+# Dashboard Entity Context Menus
+
+Every interactive data row or list item in the Ampere Studio dashboard (Stripe, Square, CMS, and future surfaces) MUST support a right-click context menu on desktop and long-press on mobile with the same actions as the row's 3-dot menu when one exists.
+
+## Required pattern
+
+1. Prefer shared wrappers from `components/cms/entity-row-actions.tsx`:
+   - `EntityRowActions` for table/list rows that also show a 3-dot dropdown
+   - `EntityContextMenu` for overview/chart/list chips that are context-menu-only
+2. Keep entity-specific actions in per-entity modules that render the same items into both menus:
+   - Stripe orders: `components/cms/stripe/orders/order-actions.tsx`
+   - Stripe products: `components/cms/stripe/product-actions.tsx`
+   - Square orders: `components/cms/square/order-actions.tsx`
+   - Square products: `components/cms/square/product-actions.tsx`
+3. Add `entityContextTargetClass` on the clickable/long-press target so mobile does not show the native callout.
+4. Nested entities (e.g. products inside an order) get their own product menu. Stop context-menu bubbling so the parent order menu does not steal the event.
+5. Overview / analytics rows (recent orders, failed payments, top products) must use the same entity menus as the dedicated list pages. Do not ship view-only links without the context menu.
+
+## When adding a new entity surface
+
+- If the UI shows an order, product, submission, or similar record, wrap it with the matching entity context menu before merge.
+- Actions must match what that entity supports today (View / Edit / Archive / Delete / etc.). Do not invent Square order refunds, etc., unless the API exists.
+- For Square line items, resolve `catalog_object_id` (variation) to the parent ITEM via `buildVariationProductIndex` before linking to `/products/[id]`.
+
+## Anti-patterns
+
+```tsx
+// BAD: row with only a link / 3-dot dropdown and no right-click menu
+<TableRow>
+  <TableCell><Link href={`/orders/${id}`}>...</Link></TableCell>
+  <TableCell><DropdownMenu>...</DropdownMenu></TableCell>
+</TableRow>
+
+// GOOD: shared dual menu
+<OrderRowActions order={order}>
+  {(dropdown) => (
+    <TableRow className={entityContextTargetClass}>
+      ...
+      <TableCell>{dropdown}</TableCell>
+    </TableRow>
+  )}
+</OrderRowActions>
+```

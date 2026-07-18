@@ -1,12 +1,14 @@
 import { notFound, redirect } from "next/navigation"
 
 import { PageHeading } from "@/components/cms/page-heading"
+import { SquareOrderLineItems } from "@/components/cms/square/square-order-line-items"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { buildVariationProductIndex } from "@/lib/square/catalog-resolve"
 import { isSquareOrdersEnabled } from "@/lib/square/config"
 import { getSquareOrder } from "@/lib/square/orders"
-import type { KmOrderState, SquareOrder } from "@/lib/square/types"
+import { listSquareProducts } from "@/lib/square/products"
+import type { KmOrderState } from "@/lib/square/types"
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -27,6 +29,8 @@ export default async function SquareOrderDetailPage({ params }: Props) {
 
   const state = (order.km_state ?? "OPEN") as KmOrderState
   const fulfillment = order.fulfillments?.[0]
+  const variationIndex = buildVariationProductIndex(await listSquareProducts())
+  const productByCatalogId = Object.fromEntries(variationIndex.entries())
 
   return (
     <div className="space-y-6">
@@ -47,34 +51,10 @@ export default async function SquareOrderDetailPage({ params }: Props) {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {(order.line_items ?? []).map((li, i) => (
-                  <div key={i} className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">{li.name}</p>
-                      {li.variation_name && (
-                        <p className="text-sm text-muted-foreground">
-                          {li.variation_name}
-                        </p>
-                      )}
-                      {li.note && (
-                        <p className="text-xs text-muted-foreground italic">
-                          {li.note}
-                        </p>
-                      )}
-                      {(li.modifiers ?? []).map((m, mi) => (
-                        <p key={mi} className="text-xs text-muted-foreground">
-                          + {m.name}
-                        </p>
-                      ))}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm">x{li.quantity}</p>
-                      <p className="font-medium">
-                        {formatMoney(li.total_money?.amount)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                <SquareOrderLineItems
+                  items={order.line_items ?? []}
+                  productByCatalogId={productByCatalogId}
+                />
                 <div className="space-y-1 border-t pt-3 text-sm">
                   {order.total_discount_money?.amount ? (
                     <div className="flex justify-between text-green-600">

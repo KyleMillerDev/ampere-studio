@@ -49,7 +49,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
+import { entityContextTargetClass } from "@/components/cms/entity-row-actions"
+import { SquareOrderContextMenu } from "@/components/cms/square/order-actions"
+import { SquareProductContextMenu } from "@/components/cms/square/product-actions"
 import type { DashboardSummary, KmOrderState } from "@/lib/square/types"
+import { cn } from "@/lib/utils"
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 
@@ -1121,28 +1125,35 @@ export function SalesOverview() {
                 ) : (
                   <div className="space-y-2">
                     {summary.top_products.map((p, i) => (
-                      <div
+                      <SquareProductContextMenu
                         key={p.id}
-                        className="flex items-center justify-between text-sm"
+                        product={{ id: p.id, name: p.name }}
                       >
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span
-                            className={`w-5 shrink-0 text-center text-xs font-bold ${i === 0 ? "text-yellow-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-muted-foreground"}`}
-                          >
-                            {i + 1}
+                        <div
+                          className={cn(
+                            "flex items-center justify-between rounded-md px-1 py-0.5 text-sm",
+                            entityContextTargetClass
+                          )}
+                        >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span
+                              className={`w-5 shrink-0 text-center text-xs font-bold ${i === 0 ? "text-yellow-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-muted-foreground"}`}
+                            >
+                              {i + 1}
+                            </span>
+                            <span className="truncate">{p.name}</span>
+                            <Badge
+                              variant="secondary"
+                              className="shrink-0 text-xs"
+                            >
+                              {p.quantity}x
+                            </Badge>
+                          </div>
+                          <span className="ml-3 shrink-0 font-medium tabular-nums">
+                            {fmt(p.revenue)}
                           </span>
-                          <span className="truncate">{p.name}</span>
-                          <Badge
-                            variant="secondary"
-                            className="shrink-0 text-xs"
-                          >
-                            {p.quantity}x
-                          </Badge>
                         </div>
-                        <span className="ml-3 shrink-0 font-medium tabular-nums">
-                          {fmt(p.revenue)}
-                        </span>
-                      </div>
+                      </SquareProductContextMenu>
                     ))}
                   </div>
                 )}
@@ -1265,37 +1276,44 @@ export function SalesOverview() {
               <CardContent>
                 <div className="space-y-2">
                   {summary.recent_orders.map((o) => (
-                    <div key={o.id} className="flex items-center gap-3 text-sm">
-                      <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground">
-                        {o.id.slice(-8)}
-                      </span>
-                      <Badge
-                        variant={
-                          o.km_state === "COMPLETED"
-                            ? "default"
-                            : o.km_state === "CANCELED"
-                              ? "destructive"
-                              : "secondary"
-                        }
-                        className="shrink-0"
-                      >
-                        {STATE_LABELS[o.km_state] ?? o.km_state}
-                      </Badge>
-                      <span className="min-w-0 flex-1 truncate">
-                        {o.product_name}
-                        {o.extra_items > 0 && (
-                          <span className="ml-1 text-muted-foreground">
-                            +{o.extra_items}
-                          </span>
+                    <SquareOrderContextMenu key={o.id} order={o}>
+                      <div
+                        className={cn(
+                          "flex items-center gap-3 rounded-md px-1 py-0.5 text-sm",
+                          entityContextTargetClass
                         )}
-                      </span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {new Date(o.created_at).toLocaleDateString()}
-                      </span>
-                      <span className="shrink-0 font-medium tabular-nums">
-                        {fmt(o.total_money.amount)}
-                      </span>
-                    </div>
+                      >
+                        <span className="w-20 shrink-0 font-mono text-xs text-muted-foreground">
+                          {o.id.slice(-8)}
+                        </span>
+                        <Badge
+                          variant={
+                            o.km_state === "COMPLETED"
+                              ? "default"
+                              : o.km_state === "CANCELED"
+                                ? "destructive"
+                                : "secondary"
+                          }
+                          className="shrink-0"
+                        >
+                          {STATE_LABELS[o.km_state] ?? o.km_state}
+                        </Badge>
+                        <span className="min-w-0 flex-1 truncate">
+                          {o.product_name}
+                          {o.extra_items > 0 && (
+                            <span className="ml-1 text-muted-foreground">
+                              +{o.extra_items}
+                            </span>
+                          )}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {new Date(o.created_at).toLocaleDateString()}
+                        </span>
+                        <span className="shrink-0 font-medium tabular-nums">
+                          {fmt(o.total_money.amount)}
+                        </span>
+                      </div>
+                    </SquareOrderContextMenu>
                   ))}
                 </div>
               </CardContent>

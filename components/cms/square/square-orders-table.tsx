@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ArrowUpDownIcon, RefreshCwIcon } from "lucide-react"
@@ -16,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { entityContextTargetClass } from "@/components/cms/entity-row-actions"
+import { SquareOrderRowActions } from "@/components/cms/square/order-actions"
 import { TablePagination } from "@/components/cms/table-pagination"
 import {
   Table,
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui/table"
 
 import type { KmOrderState, SquareOrder } from "@/lib/square/types"
+import { cn } from "@/lib/utils"
 
 const stateVariant: Record<
   KmOrderState,
@@ -52,11 +54,7 @@ function formatMoney(amount?: number): string {
   return `$${(amount / 100).toFixed(2)}`
 }
 
-type SortKey =
-  | "date_desc"
-  | "date_asc"
-  | "total_desc"
-  | "total_asc"
+type SortKey = "date_desc" | "date_asc" | "total_desc" | "total_asc"
 
 type StateFilter = "all" | KmOrderState
 
@@ -102,7 +100,9 @@ export function SquareOrdersTable({ orders }: Props) {
     sortKey
   )
 
-  useEffect(() => { setPage(1) }, [search, sortKey, stateFilter])
+  useEffect(() => {
+    setPage(1)
+  }, [search, sortKey, stateFilter])
 
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
 
@@ -204,7 +204,9 @@ export function SquareOrdersTable({ orders }: Props) {
           disabled={syncing}
           onClick={handleSync}
         >
-          <RefreshCwIcon className={`size-3.5 ${syncing ? "animate-spin" : ""}`} />
+          <RefreshCwIcon
+            className={`size-3.5 ${syncing ? "animate-spin" : ""}`}
+          />
           {syncing ? "Syncing..." : "Sync"}
         </Button>
       </div>
@@ -234,44 +236,51 @@ export function SquareOrdersTable({ orders }: Props) {
                 const fulfillment = order.fulfillments?.[0]
 
                 return (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-mono text-xs">
-                      {order.id.slice(-8)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={stateVariant[state]}>
-                        {stateLabels[state]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">
-                        {firstItem?.name ?? "—"}
-                        {(order.line_items?.length ?? 0) > 1 && (
-                          <span className="ml-1 text-muted-foreground">
-                            +{(order.line_items?.length ?? 1) - 1}
-                          </span>
+                  <SquareOrderRowActions key={order.id} order={order}>
+                    {(dropdown) => (
+                      <TableRow
+                        className={cn(
+                          "cursor-default",
+                          entityContextTargetClass
                         )}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatMoney(order.total_money?.amount)}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">
-                        {fulfillment?.type ?? "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {order.created_at
-                        ? new Date(order.created_at).toLocaleDateString()
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/square/orders/${order.id}`}>View</Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                      >
+                        <TableCell className="font-mono text-xs">
+                          {order.id.slice(-8)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={stateVariant[state]}>
+                            {stateLabels[state]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {firstItem?.name ?? "—"}
+                            {(order.line_items?.length ?? 0) > 1 && (
+                              <span className="ml-1 text-muted-foreground">
+                                +{(order.line_items?.length ?? 1) - 1}
+                              </span>
+                            )}
+                          </span>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {formatMoney(order.total_money?.amount)}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
+                            {fulfillment?.type ?? "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {order.created_at
+                            ? new Date(order.created_at).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end">{dropdown}</div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </SquareOrderRowActions>
                 )
               })}
             </TableBody>

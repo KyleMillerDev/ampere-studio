@@ -2,8 +2,6 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import {
   createColumnHelper,
   flexRender,
@@ -13,7 +11,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Image01Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons"
+import { Image01Icon } from "@hugeicons/core-free-icons"
 
 import {
   Table,
@@ -23,15 +21,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { entityContextTargetClass } from "@/components/cms/entity-row-actions"
+import { StripeProductRowActions } from "@/components/cms/stripe/product-actions"
 import { formatStripeAmount, formatUnixDate } from "@/lib/utils"
 import type { StripeProductView } from "@/lib/validation/stripe-product.schema"
 
@@ -54,7 +46,6 @@ interface StripeProductsTableProps {
 }
 
 export function StripeProductsTable({ products }: StripeProductsTableProps) {
-  const router = useRouter()
   const [sorting, setSorting] = useState<SortingState>([])
 
   const columns = useMemo(() => {
@@ -126,56 +117,10 @@ export function StripeProductsTable({ products }: StripeProductsTableProps) {
       col.display({
         id: "actions",
         header: "",
-        cell: (info) => (
-          <div className="flex justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Row actions">
-                  <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href={`/products/${info.row.original.id}`}>View</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/products/${info.row.original.id}/edit`}>
-                    Edit
-                  </Link>
-                </DropdownMenuItem>
-                {info.row.original.active ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={async () => {
-                        const ok = window.confirm(
-                          `Archive "${info.row.original.name}"? It stays in Stripe but is hidden from new purchases.`
-                        )
-                        if (!ok) return
-                        const res = await fetch(
-                          `/api/stripe/products/${info.row.original.id}`,
-                          { method: "DELETE" }
-                        )
-                        if (!res.ok) {
-                          toast.error("Could not archive product")
-                          return
-                        }
-                        toast.success("Product archived")
-                        router.refresh()
-                      }}
-                    >
-                      Archive
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ),
+        cell: () => null,
       }),
     ]
-  }, [router])
+  }, [])
 
   const table = useReactTable({
     data: products,
@@ -214,15 +159,36 @@ export function StripeProductsTable({ products }: StripeProductsTableProps) {
               </TableCell>
             </TableRow>
           ) : (
-            table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
+            table.getRowModel().rows.map((row) => {
+              const product = row.original
+              return (
+                <StripeProductRowActions
+                  key={row.id}
+                  product={{
+                    id: product.id,
+                    name: product.name,
+                    active: product.active,
+                  }}
+                >
+                  {(dropdown) => (
+                    <TableRow className={entityContextTargetClass}>
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {cell.column.id === "actions" ? (
+                            <div className="flex justify-end">{dropdown}</div>
+                          ) : (
+                            flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  )}
+                </StripeProductRowActions>
+              )
+            })
           )}
         </TableBody>
       </Table>

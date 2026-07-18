@@ -58,7 +58,9 @@ export function MobileBottomNav({
   unreadSubmissionsCount = 0,
 }: MobileBottomNavProps) {
   const pathname = usePathname() ?? "/"
-  const { toggleSidebar, openMobile } = useSidebar()
+  const { toggleSidebar, openMobile, isMobile } = useSidebar()
+
+  if (!isMobile) return null
 
   const isSquare = features.catalog === "square"
 
@@ -115,7 +117,7 @@ export function MobileBottomNav({
   }
 
   return (
-    <nav className="fixed right-0 bottom-0 left-0 z-50 flex h-16 items-center justify-around border-t bg-background/90 px-3 backdrop-blur supports-backdrop-filter:bg-background/70 md:hidden">
+    <nav className="fixed right-0 bottom-0 left-0 z-50 flex h-16 items-center justify-around border-t bg-background/90 px-3 backdrop-blur supports-backdrop-filter:bg-background/70">
       {/* Hamburger — styled identically to nav items, indicator active when sheet is open */}
       <button
         onClick={toggleSidebar}

@@ -1,22 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
-import { ArrowUpDownIcon, MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react"
+import { ArrowUpDownIcon } from "lucide-react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ImageNotFound01Icon } from "@hugeicons/core-free-icons"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -25,16 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -43,9 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { entityContextTargetClass } from "@/components/cms/entity-row-actions"
+import { SquareProductRowActions } from "@/components/cms/square/product-actions"
 import { TablePagination } from "@/components/cms/table-pagination"
 
 import type { SquareMirrorProduct } from "@/lib/square/types"
+import { cn } from "@/lib/utils"
 
 interface Props {
   products: SquareMirrorProduct[]
@@ -71,7 +54,8 @@ function formatPrice(cents: number | undefined): string {
 
 function firstPrice(product: SquareMirrorProduct): number {
   return (
-    product.item_data.variations?.[0]?.item_variation_data.price_money?.amount ?? 0
+    product.item_data.variations?.[0]?.item_variation_data.price_money
+      ?.amount ?? 0
   )
 }
 
@@ -94,7 +78,10 @@ function inventoryLabel(product: SquareMirrorProduct): string {
   return t === -1 ? "—" : String(t)
 }
 
-function sortProducts(products: SquareMirrorProduct[], key: SortKey): SquareMirrorProduct[] {
+function sortProducts(
+  products: SquareMirrorProduct[],
+  key: SortKey
+): SquareMirrorProduct[] {
   return [...products].sort((a, b) => {
     switch (key) {
       case "name_asc":
@@ -124,52 +111,46 @@ function sortProducts(products: SquareMirrorProduct[], key: SortKey): SquareMirr
 }
 
 export function SquareProductsTable({ products }: Props) {
-  const router = useRouter()
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("created_desc")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [discountFilter, setDiscountFilter] = useState<DiscountFilter>("all")
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
-  const [deleting, setDeleting] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<SquareMirrorProduct | null>(null)
 
   const filtered = sortProducts(
     products.filter((p) => {
-      if (search && !p.item_data.name.toLowerCase().includes(search.toLowerCase()) && !p.slug.includes(search.toLowerCase())) return false
-      if (statusFilter === "published" && p.km_status !== "Published") return false
+      if (
+        search &&
+        !p.item_data.name.toLowerCase().includes(search.toLowerCase()) &&
+        !p.slug.includes(search.toLowerCase())
+      )
+        return false
+      if (statusFilter === "published" && p.km_status !== "Published")
+        return false
       if (statusFilter === "draft" && p.km_status !== "Draft") return false
-      if (discountFilter === "has_discount" && !(p.item_data.km_discount_amount && p.item_data.km_discount_amount > 0)) return false
-      if (discountFilter === "no_discount" && p.item_data.km_discount_amount && p.item_data.km_discount_amount > 0) return false
+      if (
+        discountFilter === "has_discount" &&
+        !(p.item_data.km_discount_amount && p.item_data.km_discount_amount > 0)
+      )
+        return false
+      if (
+        discountFilter === "no_discount" &&
+        p.item_data.km_discount_amount &&
+        p.item_data.km_discount_amount > 0
+      )
+        return false
       return true
     }),
     sortKey
   )
 
   // Reset to page 1 whenever the filtered set changes
-  useEffect(() => { setPage(1) }, [search, sortKey, statusFilter, discountFilter])
+  useEffect(() => {
+    setPage(1)
+  }, [search, sortKey, statusFilter, discountFilter])
 
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
-
-  async function handleDelete(product: SquareMirrorProduct) {
-    setDeleting(product.raw_id)
-    try {
-      const res = await fetch(`/api/square/products/${product.raw_id}`, {
-        method: "DELETE",
-      })
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string }
-        throw new Error(data.error ?? "Delete failed")
-      }
-      toast.success(`"${product.item_data.name}" deleted`)
-      router.refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed")
-    } finally {
-      setDeleting(null)
-      setDeleteTarget(null)
-    }
-  }
 
   const activeFilterCount = [
     statusFilter !== "all",
@@ -204,7 +185,10 @@ export function SquareProductsTable({ products }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+        >
           <SelectTrigger className="h-9 w-36">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -215,7 +199,10 @@ export function SquareProductsTable({ products }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={discountFilter} onValueChange={(v) => setDiscountFilter(v as DiscountFilter)}>
+        <Select
+          value={discountFilter}
+          onValueChange={(v) => setDiscountFilter(v as DiscountFilter)}
+        >
           <SelectTrigger className="h-9 w-40">
             <SelectValue placeholder="Discount" />
           </SelectTrigger>
@@ -273,105 +260,96 @@ export function SquareProductsTable({ products }: Props) {
                 const discount = product.item_data.km_discount_amount
 
                 return (
-                  <TableRow key={product.raw_id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
-                          {product.item_data.image_urls?.[0] ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={product.item_data.image_urls[0]}
-                              alt={product.item_data.name}
-                              className="size-full object-cover"
-                            />
-                          ) : (
-                            <HugeiconsIcon
-                              icon={ImageNotFound01Icon}
-                              className="size-4 text-muted-foreground"
-                            />
-                          )}
-                        </div>
-                        <div>
-                          <p className="leading-none font-medium">
-                            {product.item_data.name}
-                          </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {product.slug}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          product.km_status === "Published"
-                            ? "default"
-                            : product.km_status === "Draft"
-                              ? "secondary"
-                              : "outline"
-                        }
+                  <SquareProductRowActions
+                    key={product.raw_id}
+                    product={{
+                      id: product.raw_id,
+                      name: product.item_data.name,
+                    }}
+                  >
+                    {(dropdown) => (
+                      <TableRow
+                        className={cn(
+                          "cursor-default",
+                          entityContextTargetClass
+                        )}
                       >
-                        {product.km_status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatPrice(price)}</TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">
-                        {variationCount === 1
-                          ? "1 variation"
-                          : `${variationCount} variations`}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">{inventoryLabel(product)}</span>
-                    </TableCell>
-                    <TableCell>
-                      {discount && discount > 0 ? (
-                        <Badge
-                          variant="outline"
-                          className="border-green-200 text-green-600"
-                        >
-                          -{formatPrice(discount)}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {product.created_at
-                        ? new Date(product.created_at).toLocaleDateString()
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
+                              {product.item_data.image_urls?.[0] ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={product.item_data.image_urls[0]}
+                                  alt={product.item_data.name}
+                                  className="size-full object-cover"
+                                />
+                              ) : (
+                                <HugeiconsIcon
+                                  icon={ImageNotFound01Icon}
+                                  className="size-4 text-muted-foreground"
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <p className="leading-none font-medium">
+                                {product.item_data.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                {product.slug}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              product.km_status === "Published"
+                                ? "default"
+                                : product.km_status === "Draft"
+                                  ? "secondary"
+                                  : "outline"
+                            }
                           >
-                            <MoreHorizontalIcon className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/products/${product.raw_id}/edit`}>
-                              <PencilIcon className="mr-2 size-3.5" />
-                              Edit
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setDeleteTarget(product)}
-                          >
-                            <Trash2Icon className="mr-2 size-3.5" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                            {product.km_status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatPrice(price)}</TableCell>
+                        <TableCell>
+                          <span className="text-sm text-muted-foreground">
+                            {variationCount === 1
+                              ? "1 variation"
+                              : `${variationCount} variations`}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {inventoryLabel(product)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {discount && discount > 0 ? (
+                            <Badge
+                              variant="outline"
+                              className="border-green-200 text-green-600"
+                            >
+                              -{formatPrice(discount)}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {product.created_at
+                            ? new Date(product.created_at).toLocaleDateString()
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end">{dropdown}</div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </SquareProductRowActions>
                 )
               })}
             </TableBody>
@@ -388,31 +366,6 @@ export function SquareProductsTable({ products }: Props) {
           onPageSizeChange={setPageSize}
         />
       )}
-
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete product?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete &quot;{deleteTarget?.item_data.name}
-              &quot; from Square and the mirror. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
-              disabled={deleting !== null}
-              onClick={() => deleteTarget && handleDelete(deleteTarget)}
-            >
-              {deleting ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

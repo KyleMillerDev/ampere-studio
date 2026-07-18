@@ -54,7 +54,6 @@ export default async function DashboardLayout({
   return (
     <SidebarProvider defaultOpen>
       <AppSidebar
-        clientName={activeClient.name}
         features={features}
         ordersEnabled={ordersEnabled}
         squareEnabled={squareEnabled}
@@ -69,7 +68,10 @@ export default async function DashboardLayout({
           devClients={devClients}
         />
         <UnreadSubmissionsBanner count={unreadSubmissionsCount} />
-        <div className="flex-1 overflow-y-auto px-6 py-6 pb-20 md:pb-6">
+        <div
+          data-dashboard-content
+          className="flex-1 overflow-y-auto px-6 py-6 pb-20 group-data-[compact=false]/sidebar-wrapper:pb-6"
+        >
           {children}
         </div>
       </SidebarInset>

@@ -1,9 +1,7 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import {
   createColumnHelper,
   flexRender,
@@ -12,9 +10,6 @@ import {
   useReactTable,
   type SortingState,
 } from "@tanstack/react-table"
-import { useState } from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { MoreHorizontalIcon } from "@hugeicons/core-free-icons"
 
 import {
   Table,
@@ -24,15 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { entityContextTargetClass } from "@/components/cms/entity-row-actions"
+import { CmsProductRowActions } from "@/components/cms/product-actions"
 import { formatCents, formatDate } from "@/lib/utils"
 import type { Product } from "@/lib/validation/product.schema"
 import type { Category } from "@/lib/validation/category.schema"
@@ -43,7 +32,6 @@ interface ProductsTableProps {
 }
 
 export function ProductsTable({ products, categories }: ProductsTableProps) {
-  const router = useRouter()
   const [sorting, setSorting] = useState<SortingState>([])
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c.name])),
@@ -93,7 +81,8 @@ export function ProductsTable({ products, categories }: ProductsTableProps) {
         cell: (info) => info.getValue().toLocaleString("en-US"),
       }),
       col.accessor(
-        (row) => (row.categoryId ? (categoryMap.get(row.categoryId) ?? "—") : "—"),
+        (row) =>
+          row.categoryId ? (categoryMap.get(row.categoryId) ?? "—") : "—",
         {
           id: "category",
           header: "Category",
@@ -107,47 +96,10 @@ export function ProductsTable({ products, categories }: ProductsTableProps) {
       col.display({
         id: "actions",
         header: "",
-        cell: (info) => (
-          <div className="flex justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Row actions">
-                  <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href={`/products/${info.row.original.id}`}>Edit</Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={async () => {
-                    const ok = window.confirm(
-                      `Delete "${info.row.original.name}"?`
-                    )
-                    if (!ok) return
-                    const res = await fetch(
-                      `/api/products/${info.row.original.id}`,
-                      { method: "DELETE" }
-                    )
-                    if (!res.ok) {
-                      toast.error("Could not delete product")
-                      return
-                    }
-                    toast.success("Product deleted")
-                    router.refresh()
-                  }}
-                >
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ),
+        cell: () => null,
       }),
     ]
-  }, [categoryMap, router])
+  }, [categoryMap])
 
   const table = useReactTable({
     data: products,
@@ -181,19 +133,37 @@ export function ProductsTable({ products, categories }: ProductsTableProps) {
                 colSpan={columns.length}
                 className="h-32 text-center text-sm text-muted-foreground"
               >
-                No products yet. Create your first product to populate the storefront.
+                No products yet. Create your first product to populate the
+                storefront.
               </TableCell>
             </TableRow>
           ) : (
-            table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
+            table.getRowModel().rows.map((row) => {
+              const product = row.original
+              return (
+                <CmsProductRowActions
+                  key={row.id}
+                  product={{ id: product.id, name: product.name }}
+                >
+                  {(dropdown) => (
+                    <TableRow className={entityContextTargetClass}>
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {cell.column.id === "actions" ? (
+                            <div className="flex justify-end">{dropdown}</div>
+                          ) : (
+                            flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  )}
+                </CmsProductRowActions>
+              )
+            })
           )}
         </TableBody>
       </Table>

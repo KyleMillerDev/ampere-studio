@@ -1,7 +1,11 @@
+"use client"
+
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Image01Icon } from "@hugeicons/core-free-icons"
 
 import { Badge } from "@/components/ui/badge"
+import { entityContextTargetClass } from "@/components/cms/entity-row-actions"
+import { StripeProductContextMenu } from "@/components/cms/stripe/product-actions"
 import { cn, formatStripeAmount } from "@/lib/utils"
 import {
   buildOrderLineChanges,
@@ -77,7 +81,7 @@ function lineTotalForChange(change: OrderLineChange): number | null {
   return change.unitAmount * qty
 }
 
-function LineRow({
+function LineRowContent({
   change,
   currency,
   compact,
@@ -98,7 +102,13 @@ function LineRow({
   const iconSize = compact ? "size-3.5" : "size-5"
 
   return (
-    <div className={cn("flex items-center gap-3", removed && "opacity-60")}>
+    <div
+      className={cn(
+        "flex items-center gap-3 rounded-md",
+        removed && "opacity-60",
+        change.productId && entityContextTargetClass
+      )}
+    >
       <div
         className={cn(
           "flex shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted",
@@ -159,6 +169,31 @@ function LineRow({
         {total !== null ? formatStripeAmount(total, currency) : "—"}
       </p>
     </div>
+  )
+}
+
+function LineRow({
+  change,
+  currency,
+  compact,
+}: {
+  change: OrderLineChange
+  currency: string
+  compact?: boolean
+}) {
+  const content = (
+    <LineRowContent change={change} currency={currency} compact={compact} />
+  )
+
+  if (!change.productId) return content
+
+  return (
+    <StripeProductContextMenu
+      product={{ id: change.productId, name: change.name }}
+    >
+      {/* Stop bubbling so the parent order row context menu does not steal the event. */}
+      <div onContextMenu={(event) => event.stopPropagation()}>{content}</div>
+    </StripeProductContextMenu>
   )
 }
 

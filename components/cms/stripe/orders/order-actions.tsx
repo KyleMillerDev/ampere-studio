@@ -1,11 +1,6 @@
 "use client"
 
-import {
-  useState,
-  type ComponentType,
-  type ReactElement,
-  type ReactNode,
-} from "react"
+import { useState, type ReactElement, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -24,13 +19,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -45,6 +33,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  EntityContextMenu,
+  EntityRowActions,
+  type EntityMenuParts,
+} from "@/components/cms/entity-row-actions"
+import type {
+  FailedStripePayment,
+  RecentStripeOrder,
+} from "@/lib/stripe/analytics"
 import type { OrderView, TrackingCarrier } from "@/lib/stripe/order-model"
 
 type DialogType =
@@ -64,17 +61,6 @@ function isActionableOrder(order: OrderView): boolean {
   return order.status !== "Failed" && !isCheckoutStatus(order.status)
 }
 
-type MenuItemProps = {
-  className?: string
-  onSelect?: (event: Event) => void
-  asChild?: boolean
-  children?: ReactNode
-}
-
-type MenuSeparatorProps = {
-  className?: string
-}
-
 function OrderMenuItems({
   order,
   onOpen,
@@ -83,9 +69,7 @@ function OrderMenuItems({
 }: {
   order: OrderView
   onOpen: (type: DialogType) => void
-  Item: ComponentType<MenuItemProps>
-  Separator: ComponentType<MenuSeparatorProps>
-}) {
+} & EntityMenuParts) {
   const actionable = isActionableOrder(order)
 
   return (
@@ -133,6 +117,80 @@ function OrderMenuItems({
       )}
     </>
   )
+}
+
+/**
+ * Minimal OrderView for overview / analytics rows so they can share the full
+ * order action menu (dialogs hydrate defaults from these fields).
+ */
+export function orderActionViewFromRecent(order: RecentStripeOrder): OrderView {
+  return {
+    id: order.id,
+    confirmationNumber: order.confirmation_number,
+    amount: order.amount,
+    currency: "usd",
+    status: order.status,
+    created: order.created,
+    customerEmail: order.customer_email,
+    customerName: order.customer_name,
+    shipping: null,
+    lineItems: [],
+    originalLineItems: [],
+    subtotal: null,
+    originalSubtotal: null,
+    shippingCost: null,
+    tracking: null,
+    trackingCarrier: null,
+    shippedAt: null,
+    editedAt: null,
+    statusOverride: null,
+    archived: false,
+    rawMetadata: {},
+    hasDispute: false,
+    isRefunded: order.is_refunded,
+    isPartiallyRefunded: false,
+    refundedAmount: 0,
+    netAmount: order.amount,
+    refunds: [],
+    history: [],
+    paymentMethod: order.payment_method,
+  }
+}
+
+export function orderActionViewFromFailed(
+  payment: FailedStripePayment
+): OrderView {
+  return {
+    id: payment.id,
+    confirmationNumber: payment.id.slice(-12).toUpperCase(),
+    amount: payment.amount,
+    currency: "usd",
+    status: "Failed",
+    created: payment.created,
+    customerEmail: payment.customer_email,
+    customerName: payment.customer_name,
+    shipping: null,
+    lineItems: [],
+    originalLineItems: [],
+    subtotal: null,
+    originalSubtotal: null,
+    shippingCost: null,
+    tracking: null,
+    trackingCarrier: null,
+    shippedAt: null,
+    editedAt: null,
+    statusOverride: null,
+    archived: false,
+    rawMetadata: {},
+    hasDispute: false,
+    isRefunded: false,
+    isPartiallyRefunded: false,
+    refundedAmount: 0,
+    netAmount: payment.amount,
+    refunds: [],
+    history: [],
+    paymentMethod: payment.payment_method,
+  }
 }
 
 function OrderActionDialogs({
@@ -602,14 +660,16 @@ export function OrderActions({ order }: OrderActionsProps) {
 }
 
 /**
- * List-row helper: right-click on the main row or expanded content opens the
- * same actions menu at the cursor. Pass the 3-dot control via the render callback.
+ * List-row helper: right-click / long-press on the main row or expanded content
+ * opens the same actions menu at the cursor. Pass the 3-dot control via the
+ * render callback, or set showDropdown={false} for context-menu-only surfaces.
  */
 export function OrderRowActions({
   order,
   children,
   expandedRow,
   onContextMenuOpenChange,
+  showDropdown = true,
 }: {
   order: OrderView
   /** Must return a single element (e.g. TableRow) that can take a ref. */
@@ -618,43 +678,47 @@ export function OrderRowActions({
   expandedRow?: ReactElement | null
   /** Fires when the right-click / long-press menu opens or closes. */
   onContextMenuOpenChange?: (open: boolean) => void
+  showDropdown?: boolean
 }) {
   const [open, setOpen] = useState<DialogType>(null)
 
-  const dropdown = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Order actions">
-          <HugeiconsIcon icon={MoreHorizontalIcon} className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
-        <OrderMenuItems
-          order={order}
-          onOpen={setOpen}
-          Item={DropdownMenuItem}
-          Separator={DropdownMenuSeparator}
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
+  return (
+    <>
+      <EntityRowActions
+        showDropdown={showDropdown}
+        dropdownAriaLabel="Order actions"
+        onContextMenuOpenChange={onContextMenuOpenChange}
+        expandedRow={expandedRow}
+        renderItems={(parts) => (
+          <OrderMenuItems order={order} onOpen={setOpen} {...parts} />
+        )}
+      >
+        {children}
+      </EntityRowActions>
+      <OrderActionDialogs order={order} open={open} setOpen={setOpen} />
+    </>
   )
+}
+
+/** Context-menu-only wrapper for overview / chart list rows. */
+export function OrderEntityContextMenu({
+  order,
+  children,
+}: {
+  order: OrderView
+  children: ReactElement
+}) {
+  const [open, setOpen] = useState<DialogType>(null)
 
   return (
     <>
-      <ContextMenu onOpenChange={onContextMenuOpenChange}>
-        <ContextMenuTrigger asChild>{children(dropdown)}</ContextMenuTrigger>
-        {expandedRow ? (
-          <ContextMenuTrigger asChild>{expandedRow}</ContextMenuTrigger>
-        ) : null}
-        <ContextMenuContent className="w-44">
-          <OrderMenuItems
-            order={order}
-            onOpen={setOpen}
-            Item={ContextMenuItem}
-            Separator={ContextMenuSeparator}
-          />
-        </ContextMenuContent>
-      </ContextMenu>
+      <EntityContextMenu
+        renderItems={(parts) => (
+          <OrderMenuItems order={order} onOpen={setOpen} {...parts} />
+        )}
+      >
+        {children}
+      </EntityContextMenu>
       <OrderActionDialogs order={order} open={open} setOpen={setOpen} />
     </>
   )
