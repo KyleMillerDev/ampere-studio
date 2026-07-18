@@ -1,36 +1,41 @@
-import { HugeiconsIcon } from "@hugeicons/react"
-import { ChartBarLineIcon } from "@hugeicons/core-free-icons"
+/**
+ * Analytics page — server gate.
+ *
+ * Renders the full client dashboard wrapped in a Suspense boundary.
+ * The client dashboard handles all states:
+ *   - `not_configured`: shows the coming-soon card (no PostHog key for client)
+ *   - `connection_error`: shows a clear credential error
+ *   - `loading`: shows skeletons
+ *   - `ready`: shows the live dashboard
+ *
+ * `activeClientId` is passed from the server so "Viewing as" switches
+ * (router.refresh) remount/refetch client data for the new client.
+ */
+import { Suspense } from "react"
 
+import { AnalyticsDashboard } from "@/components/cms/analytics/analytics-dashboard"
+import { AnalyticsLoadingState } from "@/components/cms/analytics/widget-states"
 import { PageHeading } from "@/components/cms/page-heading"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { getActiveClientId } from "@/lib/cms/client-context"
 
 export const metadata = { title: "Analytics" }
 
-export default function AnalyticsPage() {
+export default async function AnalyticsPage() {
+  const activeClientId = await getActiveClientId()
+
   return (
-    <div className="space-y-6">
-      <PageHeading
-        title="Analytics"
-        description="Traffic, conversions, and engagement across your Ampere client sites."
-      />
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <HugeiconsIcon icon={ChartBarLineIcon} className="size-4" />
-            </span>
-            Coming soon
-          </CardTitle>
-          <CardDescription>
-            We are wiring this page up to PostHog and Google Analytics. For now your
-            events are still being captured.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Once connected, you will see pageviews, top referrers, and conversion trends
-          right here.
-        </CardContent>
-      </Card>
-    </div>
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          <PageHeading
+            title="Analytics"
+            description="Traffic, conversions, and engagement across your site."
+          />
+          <AnalyticsLoadingState />
+        </div>
+      }
+    >
+      <AnalyticsDashboard activeClientId={activeClientId} />
+    </Suspense>
   )
 }

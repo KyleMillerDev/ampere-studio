@@ -31,16 +31,31 @@ let cachedAt = 0
  * memoized for a few minutes. Returns an empty object when the secret is
  * missing or unreadable so callers can treat "no keys" as a soft state.
  */
+/**
+ * Read SecretString and scrub the SDK response object immediately.
+ * Next.js flight / error channels have been observed retaining awaited AWS
+ * responses by reference; clearing SecretString reduces that exposure.
+ */
+async function readSecretString(secretId: string): Promise<string> {
+  const res = await getSecretsManager().send(
+    new GetSecretValueCommand({ SecretId: secretId })
+  )
+  const raw = typeof res.SecretString === "string" ? res.SecretString : "{}"
+  try {
+    ;(res as { SecretString?: string | null }).SecretString = null
+  } catch {
+    // ignore non-configurable fields
+  }
+  return raw
+}
+
 export async function getClientKeysSecret(): Promise<Record<string, string>> {
   const now = Date.now()
   if (cachedSecret && now - cachedAt < SECRET_CACHE_TTL_MS) {
     return cachedSecret
   }
   try {
-    const res = await getSecretsManager().send(
-      new GetSecretValueCommand({ SecretId: CLIENT_KEYS_SECRET_ID })
-    )
-    const raw = res.SecretString ?? "{}"
+    const raw = await readSecretString(CLIENT_KEYS_SECRET_ID)
     const parsed = JSON.parse(raw) as Record<string, unknown>
     const values: Record<string, string> = {}
     for (const [key, value] of Object.entries(parsed)) {
@@ -54,6 +69,32 @@ export async function getClientKeysSecret(): Promise<Record<string, string>> {
     if (cachedSecret) return cachedSecret
     return {}
   }
+}
+
+/** Drop the in-memory `ampere/clients/keys` cache after an external update. */
+export function invalidateClientKeysSecretCache(): void {
+  cachedSecret = null
+  cachedAt = 0
+}
+
+/**
+ * Merge string keys into `ampere/clients/keys` and persist.
+ * Existing keys not present in `updates` are preserved.
+ */
+export async function mergeClientKeysSecret(
+  updates: Record<string, string>
+): Promise<Record<string, string>> {
+  const current = await getClientKeysSecret()
+  const next: Record<string, string> = { ...current, ...updates }
+  await getSecretsManager().send(
+    new PutSecretValueCommand({
+      SecretId: CLIENT_KEYS_SECRET_ID,
+      SecretString: JSON.stringify(next),
+    })
+  )
+  cachedSecret = next
+  cachedAt = Date.now()
+  return next
 }
 
 // ─── Per-client Square secret cache ──────────────────────────────────────────
@@ -76,11 +117,8 @@ export async function getSquareSecret(
   if (cached && now - cached.at < SECRET_CACHE_TTL_MS) return cached.data
 
   try {
-    const res = await getSecretsManager().send(
-      new GetSecretValueCommand({ SecretId: `${clientId}/square` })
-    )
-    const raw = res.SecretString
-    if (!raw) return null
+    const raw = await readSecretString(`${clientId}/square`)
+    if (!raw || raw === "{}") return null
     const data = JSON.parse(raw) as SquareOAuthTokens
     squareSecretCache.set(clientId, { data, at: now })
     return data

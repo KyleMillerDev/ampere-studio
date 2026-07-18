@@ -41,6 +41,12 @@ export const SK_PREFIX = {
 export type ContentType = keyof typeof SK_PREFIX
 
 /**
+ * Per-user analytics dashboard layout rows in Ampere-Studio-Content.
+ * Full SK: `analayout_<cognitoSub>` (see ANALYTICS_LAYOUT_SK_PREFIX in types).
+ */
+export const ANALYTICS_LAYOUT_SK_PREFIX = "analayout_" as const
+
+/**
  * Square mirror SK prefixes. All rows additionally carry `raw_id` (the
  * un-prefixed Square catalog / order ID) and a `type` discriminant.
  *
