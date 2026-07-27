@@ -1,15 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
+import { X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -42,6 +44,171 @@ import {
   type RentalCreateInput,
   type RentalRecord,
 } from "@/lib/validation/rental.schema"
+
+// ── Reusable adornment wrappers ──────────────────────────────────────────────
+
+function InputPrefix({
+  prefix,
+  children,
+}: {
+  prefix: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="relative">
+      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-muted-foreground">
+        {prefix}
+      </span>
+      <div className="[&_input]:pl-7">{children}</div>
+    </div>
+  )
+}
+
+function InputSuffix({
+  suffix,
+  children,
+}: {
+  suffix: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="relative">
+      <div className="[&_input]:pr-16">{children}</div>
+      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">
+        {suffix}
+      </span>
+    </div>
+  )
+}
+
+// ── Amenity tag chip input ───────────────────────────────────────────────────
+
+function AmenityTagsInput({
+  value,
+  onChange,
+}: {
+  value: string[]
+  onChange: (v: string[]) => void
+}) {
+  const [input, setInput] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function addTag(raw: string) {
+    const trimmed = raw.trim()
+    if (trimmed && !value.includes(trimmed)) {
+      onChange([...value, trimmed])
+    }
+    setInput("")
+  }
+
+  function removeTag(tag: string) {
+    onChange(value.filter((t) => t !== tag))
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault()
+      addTag(input)
+    } else if (e.key === "Backspace" && !input && value.length > 0) {
+      removeTag(value[value.length - 1])
+    }
+  }
+
+  function handleBlur() {
+    if (input.trim()) addTag(input)
+  }
+
+  // Handle pasted comma-separated lists
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData("text")
+    if (text.includes(",")) {
+      e.preventDefault()
+      const tags = text
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+      const next = [...value]
+      for (const tag of tags) {
+        if (!next.includes(tag)) next.push(tag)
+      }
+      onChange(next)
+    }
+  }
+
+  return (
+    <div
+      className="flex min-h-10 w-full cursor-text flex-wrap gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+      onClick={() => inputRef.current?.focus()}
+    >
+      {value.map((tag) => (
+        <Badge key={tag} variant="secondary" className="gap-1 pr-1">
+          {tag}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              removeTag(tag)
+            }}
+            className="ml-0.5 rounded-sm opacity-60 hover:opacity-100 focus:outline-none"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      ))}
+      <input
+        ref={inputRef}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        onPaste={handlePaste}
+        placeholder={
+          value.length === 0
+            ? "Type a tag and press Enter or comma…"
+            : "Add more…"
+        }
+        className="min-w-35 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+      />
+    </div>
+  )
+}
+
+// ── Dropdown option builders ─────────────────────────────────────────────────
+
+const BED_OPTIONS = [
+  { value: 0, label: "Studio / 0" },
+  ...Array.from({ length: 10 }, (_, i) => ({
+    value: i + 1,
+    label: `${i + 1}`,
+  })),
+]
+
+const BATH_OPTIONS = Array.from({ length: 7 }, (_, i) => ({
+  value: i,
+  label: `${i}`,
+}))
+
+const HALF_BATH_OPTIONS = Array.from({ length: 5 }, (_, i) => ({
+  value: i,
+  label: `${i}`,
+}))
+
+const GARAGE_OPTIONS = [
+  { value: 0, label: "None" },
+  ...Array.from({ length: 6 }, (_, i) => ({
+    value: i + 1,
+    label: `${i + 1}`,
+  })),
+]
+
+const STORIES_OPTIONS = [
+  { value: 1, label: "1" },
+  { value: 2, label: "2" },
+  { value: 3, label: "3" },
+  { value: 4, label: "4+" },
+]
+
+// ── Main form ────────────────────────────────────────────────────────────────
 
 interface RentalFormProps {
   initial?: RentalRecord
@@ -86,7 +253,6 @@ export function RentalForm({ initial }: RentalFormProps) {
   async function onSubmit(values: RentalCreateInput) {
     const url = isEdit ? `/api/rentals/${initial!.id}` : "/api/rentals"
     const method = isEdit ? "PATCH" : "POST"
-
     const payload = isEdit ? { ...values, slug: undefined } : values
 
     const res = await fetch(url, {
@@ -112,9 +278,7 @@ export function RentalForm({ initial }: RentalFormProps) {
     const ok = window.confirm(`Delete "${label}"? This cannot be undone.`)
     if (!ok) return
     setIsDeleting(true)
-    const res = await fetch(`/api/rentals/${initial.id}`, {
-      method: "DELETE",
-    })
+    const res = await fetch(`/api/rentals/${initial.id}`, { method: "DELETE" })
     setIsDeleting(false)
     if (!res.ok) {
       toast.error("Could not delete rental")
@@ -128,11 +292,10 @@ export function RentalForm({ initial }: RentalFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* ── Row 1: Details + Status sidebar ─────────────────────── */}
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-          {/* Details */}
+          {/* ── Left column ───────────────────────────────────────────── */}
           <div className="space-y-6">
-            {/* Location */}
+            {/* Location ------------------------------------------------ */}
             <Card>
               <CardHeader>
                 <CardTitle>Location</CardTitle>
@@ -154,7 +317,9 @@ export function RentalForm({ initial }: RentalFormProps) {
                     </FormItem>
                   )}
                 />
-                <div className="grid gap-4 sm:grid-cols-3">
+
+                {/* City / State / ZIP */}
+                <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
                   <FormField
                     control={form.control}
                     name="address.city"
@@ -175,7 +340,15 @@ export function RentalForm({ initial }: RentalFormProps) {
                       <FormItem>
                         <FormLabel>State</FormLabel>
                         <FormControl>
-                          <Input placeholder="IA" maxLength={2} {...field} />
+                          <Input
+                            placeholder="IA"
+                            maxLength={2}
+                            className="uppercase"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(e.target.value.toUpperCase())
+                            }
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -188,13 +361,20 @@ export function RentalForm({ initial }: RentalFormProps) {
                       <FormItem>
                         <FormLabel>ZIP</FormLabel>
                         <FormControl>
-                          <Input placeholder="52537" {...field} />
+                          <Input
+                            placeholder="52537"
+                            inputMode="numeric"
+                            maxLength={10}
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
+
+                {/* County / Slug */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FormField
                     control={form.control}
@@ -209,34 +389,32 @@ export function RentalForm({ initial }: RentalFormProps) {
                       </FormItem>
                     )}
                   />
-                  {isEdit && (
+                  {isEdit ? (
                     <FormItem>
-                      <FormLabel>Slug (locked)</FormLabel>
+                      <FormLabel>URL slug (locked)</FormLabel>
                       <FormControl>
                         <Input value={initial!.slug} disabled readOnly />
                       </FormControl>
                       <FormDescription>
-                        The slug is part of the listing URL and cannot be
-                        changed after creation.
+                        Locked after creation to preserve listing URLs.
                       </FormDescription>
                     </FormItem>
-                  )}
-                  {!isEdit && (
+                  ) : (
                     <FormField
                       control={form.control}
                       name="slug"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Slug (optional)</FormLabel>
+                          <FormLabel>URL slug</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="auto-generated from address"
+                              placeholder="Leave blank to auto-generate"
                               {...field}
                               value={field.value ?? ""}
                             />
                           </FormControl>
                           <FormDescription>
-                            Leave blank to auto-generate from the address.
+                            Auto-generated from the address if left blank.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -244,6 +422,8 @@ export function RentalForm({ initial }: RentalFormProps) {
                     />
                   )}
                 </div>
+
+                {/* Lat / Lng */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FormField
                     control={form.control}
@@ -291,15 +471,16 @@ export function RentalForm({ initial }: RentalFormProps) {
               </CardContent>
             </Card>
 
-            {/* Property facts */}
+            {/* Property details ---------------------------------------- */}
             <Card>
               <CardHeader>
-                <CardTitle>Property facts</CardTitle>
+                <CardTitle>Property details</CardTitle>
                 <CardDescription>
-                  Details shown in listing summaries and search filters.
+                  Shown in listing summaries and search filters.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
+                {/* Type & Year */}
                 <div className="grid gap-4 sm:grid-cols-2">
                   <FormField
                     control={form.control}
@@ -339,9 +520,10 @@ export function RentalForm({ initial }: RentalFormProps) {
                         <FormControl>
                           <Input
                             type="number"
-                            min={0}
+                            min={1800}
+                            max={new Date().getFullYear() + 2}
                             step={1}
-                            placeholder="2005"
+                            placeholder={String(new Date().getFullYear())}
                             {...field}
                             onChange={(e) =>
                               field.onChange(parseInt(e.target.value, 10) || 0)
@@ -353,231 +535,339 @@ export function RentalForm({ initial }: RentalFormProps) {
                     )}
                   />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-4">
-                  <FormField
-                    control={form.control}
-                    name="beds"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Beds</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseInt(e.target.value, 10) || 0)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="baths"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full baths</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={0.5}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseFloat(e.target.value) || 0)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="halfBaths"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Half baths</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseInt(e.target.value, 10) || 0)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="sqft"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sq ft</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseInt(e.target.value, 10) || 0)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+
+                {/* Beds / Full Baths / Half Baths */}
+                <div>
+                  <p className="mb-3 text-sm font-medium text-foreground">
+                    Bedrooms &amp; bathrooms
+                  </p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="beds"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bedrooms</FormLabel>
+                          <Select
+                            value={String(field.value)}
+                            onValueChange={(v) => field.onChange(Number(v))}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {BED_OPTIONS.map((o) => (
+                                <SelectItem
+                                  key={o.value}
+                                  value={String(o.value)}
+                                >
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="baths"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full baths</FormLabel>
+                          <Select
+                            value={String(field.value)}
+                            onValueChange={(v) => field.onChange(Number(v))}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {BATH_OPTIONS.map((o) => (
+                                <SelectItem
+                                  key={o.value}
+                                  value={String(o.value)}
+                                >
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="halfBaths"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Half baths</FormLabel>
+                          <Select
+                            value={String(field.value)}
+                            onValueChange={(v) => field.onChange(Number(v))}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {HALF_BATH_OPTIONS.map((o) => (
+                                <SelectItem
+                                  key={o.value}
+                                  value={String(o.value)}
+                                >
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <FormField
-                    control={form.control}
-                    name="garageSpaces"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Garage spaces</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseInt(e.target.value, 10) || 0)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="stories"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Stories</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseInt(e.target.value, 10) || 0)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lotSizeAcres"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Lot size (acres)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseFloat(e.target.value) || 0)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+
+                {/* Size */}
+                <div>
+                  <p className="mb-3 text-sm font-medium text-foreground">
+                    Size
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="sqft"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Square footage</FormLabel>
+                          <FormControl>
+                            <InputSuffix suffix="sq ft">
+                              <Input
+                                type="number"
+                                min={0}
+                                step={1}
+                                inputMode="numeric"
+                                placeholder="1,200"
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    parseInt(e.target.value, 10) || 0
+                                  )
+                                }
+                              />
+                            </InputSuffix>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="lotSizeAcres"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lot size</FormLabel>
+                          <FormControl>
+                            <InputSuffix suffix="acres">
+                              <Input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                placeholder="0.25"
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    parseFloat(e.target.value) || 0
+                                  )
+                                }
+                              />
+                            </InputSuffix>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <FormField
-                    control={form.control}
-                    name="hoaFee"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>HOA fee ($/mo)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseFloat(e.target.value) || 0)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="propertyTax"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Property tax ($/yr)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseFloat(e.target.value) || 0)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="daysOnMarket"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Days on market</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={0}
-                            step={1}
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(parseInt(e.target.value, 10) || 0)
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+
+                {/* Garage / Stories */}
+                <div>
+                  <p className="mb-3 text-sm font-medium text-foreground">
+                    Structure
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="garageSpaces"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Garage spaces</FormLabel>
+                          <Select
+                            value={String(field.value)}
+                            onValueChange={(v) => field.onChange(Number(v))}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {GARAGE_OPTIONS.map((o) => (
+                                <SelectItem
+                                  key={o.value}
+                                  value={String(o.value)}
+                                >
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="stories"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Stories</FormLabel>
+                          <Select
+                            value={String(field.value)}
+                            onValueChange={(v) => field.onChange(Number(v))}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {STORIES_OPTIONS.map((o) => (
+                                <SelectItem
+                                  key={o.value}
+                                  value={String(o.value)}
+                                >
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Financial / market */}
+                <div>
+                  <p className="mb-3 text-sm font-medium text-foreground">
+                    Financials &amp; market info
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <FormField
+                      control={form.control}
+                      name="hoaFee"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>HOA fee</FormLabel>
+                          <FormControl>
+                            <InputPrefix prefix="$">
+                              <InputSuffix suffix="/mo">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  inputMode="numeric"
+                                  placeholder="0"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                />
+                              </InputSuffix>
+                            </InputPrefix>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="propertyTax"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Property tax</FormLabel>
+                          <FormControl>
+                            <InputPrefix prefix="$">
+                              <InputSuffix suffix="/yr">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  inputMode="numeric"
+                                  placeholder="0"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                />
+                              </InputSuffix>
+                            </InputPrefix>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="daysOnMarket"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Days on market</FormLabel>
+                          <FormControl>
+                            <InputSuffix suffix="days">
+                              <Input
+                                type="number"
+                                min={0}
+                                step={1}
+                                inputMode="numeric"
+                                placeholder="0"
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    parseInt(e.target.value, 10) || 0
+                                  )
+                                }
+                              />
+                            </InputSuffix>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Description & features */}
+            {/* Description & features ---------------------------------- */}
             <Card>
               <CardHeader>
-                <CardTitle>Description &amp; features</CardTitle>
+                <CardTitle>Description &amp; amenities</CardTitle>
                 <CardDescription>
-                  The listing description and amenity tags shown on the tenant
+                  The listing description and feature tags shown on the tenant
                   site.
                 </CardDescription>
               </CardHeader>
@@ -590,7 +880,7 @@ export function RentalForm({ initial }: RentalFormProps) {
                       <FormLabel>Description</FormLabel>
                       <FormControl>
                         <Textarea
-                          rows={8}
+                          rows={6}
                           placeholder="Describe the property, its highlights, and what makes it a great home."
                           {...field}
                         />
@@ -606,23 +896,14 @@ export function RentalForm({ initial }: RentalFormProps) {
                     <FormItem>
                       <FormLabel>Amenity tags</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="In-Unit Laundry, Garage, Pet Friendly (comma-separated)"
-                          value={field.value?.join(", ") ?? ""}
-                          onChange={(e) => {
-                            const raw = e.target.value
-                            field.onChange(
-                              raw
-                                .split(",")
-                                .map((t) => t.trim())
-                                .filter(Boolean)
-                            )
-                          }}
+                        <AmenityTagsInput
+                          value={field.value ?? []}
+                          onChange={field.onChange}
                         />
                       </FormControl>
                       <FormDescription>
-                        Comma-separated list of amenity tags. Order is
-                        preserved.
+                        Type a tag and press Enter or comma to add. Press
+                        Backspace to remove the last tag.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -631,13 +912,13 @@ export function RentalForm({ initial }: RentalFormProps) {
               </CardContent>
             </Card>
 
-            {/* Images */}
+            {/* Images -------------------------------------------------- */}
             <Card>
               <CardHeader>
-                <CardTitle>Images</CardTitle>
+                <CardTitle>Photos</CardTitle>
                 <CardDescription>
-                  Ordered image list. The first image is the primary thumbnail.
-                  Paste URLs or upload files to your media library.
+                  The first photo is used as the primary thumbnail. Drag to
+                  reorder. Paste URLs or upload directly from your device.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -660,14 +941,14 @@ export function RentalForm({ initial }: RentalFormProps) {
             </Card>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Pricing */}
+          {/* ── Right sidebar ─────────────────────────────────────────── */}
+          <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+            {/* Pricing ------------------------------------------------- */}
             <Card>
               <CardHeader>
                 <CardTitle>Pricing</CardTitle>
                 <CardDescription>
-                  Monthly rent shown as $price/mo.
+                  Monthly rent and listing date.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -676,41 +957,25 @@ export function RentalForm({ initial }: RentalFormProps) {
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Monthly rent ($)</FormLabel>
+                      <FormLabel>Monthly rent</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          min={0}
-                          step={1}
-                          inputMode="numeric"
-                          placeholder="1200"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value, 10) || 0)
-                          }
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Integer dollar amount, no currency symbol.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="mlsId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>MLS ID (optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Usually blank for rentals"
-                          value={field.value ?? ""}
-                          onChange={(e) =>
-                            field.onChange(e.target.value.trim() || null)
-                          }
-                        />
+                        <InputPrefix prefix="$">
+                          <InputSuffix suffix="/mo">
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              inputMode="numeric"
+                              placeholder="1,200"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(
+                                  parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                            />
+                          </InputSuffix>
+                        </InputPrefix>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -729,16 +994,40 @@ export function RentalForm({ initial }: RentalFormProps) {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="mlsId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        MLS ID{" "}
+                        <span className="font-normal text-muted-foreground">
+                          (optional)
+                        </span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Usually blank for rentals"
+                          value={field.value ?? ""}
+                          onChange={(e) =>
+                            field.onChange(e.target.value.trim() || null)
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </CardContent>
             </Card>
 
-            {/* Status */}
+            {/* Status -------------------------------------------------- */}
             <Card>
               <CardHeader>
                 <CardTitle>Listing status</CardTitle>
                 <CardDescription>
-                  For Rent is publicly visible. Rented hides the listing from
-                  the tenant site.
+                  "For Rent" is publicly visible. "Rented" hides the listing
+                  from the tenant site.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -747,7 +1036,6 @@ export function RentalForm({ initial }: RentalFormProps) {
                   name="status"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Status</FormLabel>
                       <Select
                         value={field.value}
                         onValueChange={field.onChange}
@@ -774,12 +1062,12 @@ export function RentalForm({ initial }: RentalFormProps) {
               </CardContent>
             </Card>
 
-            {/* Contact / agent */}
+            {/* Contact / agent ----------------------------------------- */}
             <Card>
               <CardHeader>
                 <CardTitle>Contact info</CardTitle>
                 <CardDescription>
-                  Agent shown on the listing detail page.
+                  Shown on the listing detail page.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -788,7 +1076,7 @@ export function RentalForm({ initial }: RentalFormProps) {
                   name="agent.name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Agent name</FormLabel>
+                      <FormLabel>Name</FormLabel>
                       <FormControl>
                         <Input placeholder="Kyle Smith" {...field} />
                       </FormControl>
@@ -835,19 +1123,19 @@ export function RentalForm({ initial }: RentalFormProps) {
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Actions ─────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between">
           <div>
-            {isEdit ? (
+            {isEdit && (
               <Button
                 type="button"
                 variant="destructive"
                 onClick={onDelete}
                 disabled={isDeleting}
               >
-                {isDeleting ? "Deleting..." : "Delete rental"}
+                {isDeleting ? "Deleting…" : "Delete rental"}
               </Button>
-            ) : null}
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button type="button" variant="ghost" asChild>
@@ -855,7 +1143,7 @@ export function RentalForm({ initial }: RentalFormProps) {
             </Button>
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting
-                ? "Saving..."
+                ? "Saving…"
                 : isEdit
                   ? "Save changes"
                   : "Create rental"}
