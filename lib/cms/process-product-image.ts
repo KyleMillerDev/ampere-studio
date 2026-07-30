@@ -1,20 +1,39 @@
-const MAX_IMAGE_SIZE = 512
+export interface ProcessImageOptions {
+  /** Longest edge in pixels. Defaults to 512. */
+  maxSize?: number
+  /** JPEG quality from 0 to 1. Defaults to 0.92. */
+  quality?: number
+}
 
-/** Resize large product photos to max 512px (matches KMCMS product upload behavior). */
-export async function processProductImage(file: File): Promise<File> {
-  const bitmap = await createImageBitmap(file)
+/** Resize and re-encode an image as JPEG before upload. */
+export async function processImageForUpload(
+  file: File,
+  options: ProcessImageOptions = {}
+): Promise<File> {
+  const maxSize = options.maxSize ?? 512
+  const quality = options.quality ?? 0.92
+
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    throw new Error(
+      "Could not read this image. Try saving it as JPEG or PNG and upload again."
+    )
+  }
+
   const aspect = bitmap.width / bitmap.height
 
   let width = bitmap.width
   let height = bitmap.height
 
-  if (width > MAX_IMAGE_SIZE || height > MAX_IMAGE_SIZE) {
+  if (width > maxSize || height > maxSize) {
     if (width >= height) {
-      width = MAX_IMAGE_SIZE
-      height = Math.ceil(MAX_IMAGE_SIZE / aspect)
+      width = maxSize
+      height = Math.ceil(maxSize / aspect)
     } else {
-      height = MAX_IMAGE_SIZE
-      width = Math.ceil(MAX_IMAGE_SIZE * aspect)
+      height = maxSize
+      width = Math.ceil(maxSize * aspect)
     }
   }
 
@@ -35,11 +54,19 @@ export async function processProductImage(file: File): Promise<File> {
       (result) =>
         result ? resolve(result) : reject(new Error("Could not process image")),
       "image/jpeg",
-      0.92
+      quality
     )
   })
 
-  return new File([blob], `processed_image_${crypto.randomUUID()}.jpeg`, {
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "image"
+  const safeName = baseName.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80)
+
+  return new File([blob], `${safeName}.jpg`, {
     type: "image/jpeg",
   })
+}
+
+/** Resize small product photos to max 512px (matches KMCMS product upload behavior). */
+export async function processProductImage(file: File): Promise<File> {
+  return processImageForUpload(file, { maxSize: 512, quality: 0.92 })
 }

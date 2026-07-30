@@ -1,4 +1,8 @@
 import type { StudioImage } from "@/lib/cms/images"
+import {
+  formatImageUploadError,
+  inferImageContentType,
+} from "@/lib/cms/infer-image-content-type"
 
 async function loadImageDimensions(
   file: File
@@ -32,8 +36,10 @@ async function uploadViaApi(imageId: string, file: File): Promise<void> {
     body: file,
   })
   if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as { error?: string }
-    throw new Error(err.error ?? `Upload failed with ${res.status}`)
+    const err = await res.json().catch(() => ({}))
+    throw new Error(
+      formatImageUploadError(err, `Upload failed with ${res.status}`)
+    )
   }
 }
 
@@ -44,21 +50,23 @@ export async function uploadStudioImage(
 ): Promise<StudioImage> {
   const dims = await loadImageDimensions(file)
 
+  const contentType = inferImageContentType(file)
+
   const presignRes = await fetch("/api/images", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       filename: file.name,
-      contentType: file.type || "application/octet-stream",
+      contentType,
       sizeBytes: file.size,
       alt: alt || undefined,
     }),
   })
   if (!presignRes.ok) {
-    const err = (await presignRes.json().catch(() => ({}))) as {
-      error?: string
-    }
-    throw new Error(err.error ?? `Presign failed with ${presignRes.status}`)
+    const err = await presignRes.json().catch(() => ({}))
+    throw new Error(
+      formatImageUploadError(err, `Presign failed with ${presignRes.status}`)
+    )
   }
 
   const { image } = (await presignRes.json()) as {
@@ -78,10 +86,10 @@ export async function uploadStudioImage(
     }),
   })
   if (!finalizeRes.ok) {
-    const err = (await finalizeRes.json().catch(() => ({}))) as {
-      error?: string
-    }
-    throw new Error(err.error ?? `Finalize failed with ${finalizeRes.status}`)
+    const err = await finalizeRes.json().catch(() => ({}))
+    throw new Error(
+      formatImageUploadError(err, `Finalize failed with ${finalizeRes.status}`)
+    )
   }
 
   const { image: finalized } = (await finalizeRes.json()) as {

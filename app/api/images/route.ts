@@ -19,10 +19,14 @@ const createImageSchema = z.object({
   contentType: z
     .string()
     .regex(
-      /^image\/(png|jpe?g|webp|gif|avif|svg\+xml)$/i,
+      /^image\/(png|jpe?g|webp|gif|avif|heic|heif|svg\+xml)$/i,
       "Must be an image MIME type"
     ),
-  sizeBytes: z.number().int().positive().max(MAX_BYTES),
+  sizeBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_BYTES, "Image must be 25 MB or smaller"),
   alt: z.string().max(500).optional(),
 })
 
@@ -37,34 +41,43 @@ export async function POST(req: Request) {
   const parsed = createImageSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Validation failed", issues: z.treeifyError(parsed.error) },
+      {
+        error: parsed.error.issues.map((issue) => issue.message).join("; "),
+      },
       { status: 400 }
     )
   }
 
-  const imageId = newImageId()
-  const clientId = await getActiveClientId()
-  const key = buildImageKey({
-    clientId,
-    imageId,
-    filename: parsed.data.filename,
-  })
-
-  const [image, uploadUrl] = await Promise.all([
-    createPendingImage({
+  try {
+    const imageId = newImageId()
+    const clientId = await getActiveClientId()
+    const key = buildImageKey({
       clientId,
       imageId,
       filename: parsed.data.filename,
-      contentType: parsed.data.contentType,
-      sizeBytes: parsed.data.sizeBytes,
-      alt: parsed.data.alt,
-    }),
-    presignedPutUrl({ key, contentType: parsed.data.contentType }),
-  ])
+    })
 
-  return NextResponse.json({
-    image,
-    uploadUrl,
-    key,
-  })
+    const [image, uploadUrl] = await Promise.all([
+      createPendingImage({
+        clientId,
+        imageId,
+        filename: parsed.data.filename,
+        contentType: parsed.data.contentType,
+        sizeBytes: parsed.data.sizeBytes,
+        alt: parsed.data.alt,
+      }),
+      presignedPutUrl({ key, contentType: parsed.data.contentType }),
+    ])
+
+    return NextResponse.json({
+      image,
+      uploadUrl,
+      key,
+    })
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Could not prepare image upload"
+    const status = message.includes("custom:client_id") ? 401 : 500
+    return NextResponse.json({ error: message }, { status })
+  }
 }

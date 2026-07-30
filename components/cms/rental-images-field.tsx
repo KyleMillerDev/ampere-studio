@@ -30,6 +30,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { uploadStudioImage } from "@/lib/cms/upload-studio-image"
+import { processListingImage } from "@/lib/cms/process-listing-image"
 import { cn } from "@/lib/utils"
 
 interface SortableImageRowProps {
@@ -118,6 +119,7 @@ interface RentalImagesFieldProps {
 export function RentalImagesField({ value, onChange }: RentalImagesFieldProps) {
   const [urlInput, setUrlInput] = useState("")
   const [isUploading, setIsUploading] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const sensors = useSensors(
@@ -152,10 +154,16 @@ export function RentalImagesField({ value, onChange }: RentalImagesFieldProps) {
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     if (!files.length) return
+    setIsProcessing(true)
     setIsUploading(true)
     try {
+      const processed = await Promise.all(
+        files.map((file) => processListingImage(file))
+      )
+      setIsProcessing(false)
+
       const uploaded: string[] = []
-      for (const file of files) {
+      for (const file of processed) {
         const image = await uploadStudioImage(file)
         uploaded.push(image.s3Url)
       }
@@ -168,6 +176,7 @@ export function RentalImagesField({ value, onChange }: RentalImagesFieldProps) {
     } catch (err) {
       toast.error((err as Error).message ?? "Upload failed")
     } finally {
+      setIsProcessing(false)
       setIsUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
     }
@@ -240,7 +249,11 @@ export function RentalImagesField({ value, onChange }: RentalImagesFieldProps) {
           onClick={() => fileInputRef.current?.click()}
         >
           <HugeiconsIcon icon={ImageUploadIcon} className="mr-2 size-4" />
-          {isUploading ? "Uploading..." : "Upload image files"}
+          {isProcessing
+            ? "Preparing images..."
+            : isUploading
+              ? "Uploading..."
+              : "Upload image files"}
         </Button>
       </div>
 
