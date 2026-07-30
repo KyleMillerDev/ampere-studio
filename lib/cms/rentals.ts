@@ -8,13 +8,16 @@ import {
 
 import { getDynamo } from "@/lib/aws/dynamo"
 import { CONTENT_TABLE, SK_PREFIX } from "@/lib/cms/constants"
+import { RENTAL_COUNTIES } from "@/lib/constants/rental-counties"
 import { getActiveClientId } from "@/lib/cms/client-context"
 import {
   addressToSlug,
+  normalizePropertyType,
   type RentalCreateInput,
   type RentalRecord,
   type RentalUpdateInput,
 } from "@/lib/validation/rental.schema"
+import { geocodeAddress } from "@/lib/google/geocode-address"
 
 const RENTAL_PREFIX = SK_PREFIX.rental
 
@@ -34,7 +37,11 @@ function toRental(item: Record<string, unknown>): RentalRecord {
       state: String(address.state ?? ""),
       zip: String(address.zip ?? ""),
     },
-    county: String(item.county ?? ""),
+    county: (RENTAL_COUNTIES as readonly string[]).includes(
+      String(item.county ?? "")
+    )
+      ? (String(item.county) as RentalRecord["county"])
+      : ("Davis" as RentalRecord["county"]),
     lat: Number(item.lat ?? 0),
     lng: Number(item.lng ?? 0),
     beds: Number(item.beds ?? 0),
@@ -43,7 +50,9 @@ function toRental(item: Record<string, unknown>): RentalRecord {
     sqft: Number(item.sqft ?? 0),
     lotSizeAcres: Number(item.lotSizeAcres ?? 0),
     yearBuilt: Number(item.yearBuilt ?? 0),
-    propertyType: item.propertyType as RentalRecord["propertyType"],
+    propertyType: normalizePropertyType(
+      item.propertyType != null ? String(item.propertyType) : undefined
+    ),
     garageSpaces: Number(item.garageSpaces ?? 0),
     stories: Number(item.stories ?? 1),
     hoaFee: Number(item.hoaFee ?? 0),
@@ -136,41 +145,61 @@ async function putWithUniqueSlug(
   )
 }
 
+async function withCoordinates<T extends RentalCreateInput | RentalUpdateInput>(
+  input: T
+): Promise<T> {
+  if (
+    typeof input.lat === "number" &&
+    typeof input.lng === "number" &&
+    input.lat !== 0 &&
+    input.lng !== 0
+  ) {
+    return input
+  }
+
+  if (!input.address) return input
+
+  const coords = await geocodeAddress(input.address)
+  if (!coords) return input
+
+  return { ...input, lat: coords.lat, lng: coords.lng }
+}
+
 export async function createRental(
   input: RentalCreateInput
 ): Promise<RentalRecord> {
   const clientId = await getActiveClientId()
   const now = new Date().toISOString()
 
-  const baseSlug =
-    (input.slug && input.slug.trim()) || addressToSlug(input.address)
+  const enriched = await withCoordinates(input)
+  const baseSlug = addressToSlug(enriched.address)
 
   const record: Omit<RentalRecord, "id" | "slug"> = {
     client_id: clientId,
-    status: input.status ?? "active",
-    mlsId: input.mlsId ?? null,
-    price: input.price,
-    address: input.address,
-    county: input.county,
-    lat: input.lat,
-    lng: input.lng,
-    beds: input.beds,
-    baths: input.baths,
-    halfBaths: input.halfBaths ?? 0,
-    sqft: input.sqft,
-    lotSizeAcres: input.lotSizeAcres ?? 0,
-    yearBuilt: input.yearBuilt ?? 0,
-    propertyType: input.propertyType,
-    garageSpaces: input.garageSpaces ?? 0,
-    stories: input.stories ?? 1,
-    hoaFee: input.hoaFee ?? 0,
-    propertyTax: input.propertyTax ?? 0,
-    daysOnMarket: input.daysOnMarket ?? 0,
-    listedDate: input.listedDate,
-    description: input.description,
-    features: input.features ?? [],
-    images: input.images ?? [],
-    agent: input.agent,
+    status: enriched.status ?? "active",
+    mlsId: enriched.mlsId ?? null,
+    price: enriched.price,
+    address: enriched.address,
+    county: enriched.county,
+    lat: enriched.lat,
+    lng: enriched.lng,
+    beds: enriched.beds,
+    baths: enriched.baths,
+    halfBaths: enriched.halfBaths ?? 0,
+    sqft: enriched.sqft,
+    lotSizeAcres: enriched.lotSizeAcres ?? 0,
+    yearBuilt: enriched.yearBuilt ?? 0,
+    propertyType: enriched.propertyType,
+    garageSpaces: enriched.garageSpaces ?? 0,
+    stories: enriched.stories ?? 1,
+    hoaFee: enriched.hoaFee ?? 0,
+    propertyTax: enriched.propertyTax ?? 0,
+    daysOnMarket: enriched.daysOnMarket ?? 0,
+    listedDate: enriched.listedDate,
+    description: enriched.description,
+    features: enriched.features ?? [],
+    images: enriched.images ?? [],
+    agent: enriched.agent,
     updatedAt: now,
   }
 
@@ -183,6 +212,11 @@ export async function updateRental(
 ): Promise<RentalRecord | null> {
   const clientId = await getActiveClientId()
   const now = new Date().toISOString()
+
+  let patch = input
+  if (input.address !== undefined) {
+    patch = await withCoordinates(input)
+  }
 
   const setParts: string[] = ["updatedAt = :updatedAt"]
   const values: Record<string, unknown> = { ":updatedAt": now }
@@ -214,7 +248,7 @@ export async function updateRental(
   ] as const
 
   for (const key of scalarFields) {
-    const value = input[key]
+    const value = patch[key]
     if (value === undefined) continue
     const attr = `#${key}`
     const placeholder = `:${key}`
@@ -223,15 +257,15 @@ export async function updateRental(
     setParts.push(`${attr} = ${placeholder}`)
   }
 
-  if (input.address !== undefined) {
+  if (patch.address !== undefined) {
     names["#address"] = "address"
-    values[":address"] = input.address
+    values[":address"] = patch.address
     setParts.push("#address = :address")
   }
 
-  if (input.agent !== undefined) {
+  if (patch.agent !== undefined) {
     names["#agent"] = "agent"
-    values[":agent"] = input.agent
+    values[":agent"] = patch.agent
     setParts.push("#agent = :agent")
   }
 

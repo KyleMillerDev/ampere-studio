@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation"
 
-import { PageHeading } from "@/components/cms/page-heading"
 import { RentalForm } from "@/components/cms/rental-form"
+import { getActiveClient } from "@/lib/cms/clients"
+import { parseRealtyDefaultContact } from "@/lib/cms/realty-default-contact"
 import {
   assertRentalsEnabled,
   RentalsDisabledError,
@@ -18,13 +19,17 @@ export default async function NewRentalPage() {
     throw err
   }
 
+  const client = await getActiveClient()
+  const defaultContact = parseRealtyDefaultContact(client)
+
   return (
-    <div className="space-y-6">
-      <PageHeading
-        title="New rental"
-        description="Create a new rental listing. It will be publicly visible on the tenant site once set to For Rent."
-      />
-      <RentalForm />
-    </div>
+    <RentalForm
+      heading={{
+        title: "New rental",
+        description:
+          "Create a new rental listing. It will be publicly visible on the tenant site once set to For Rent.",
+      }}
+      defaultContact={defaultContact}
+    />
   )
 }

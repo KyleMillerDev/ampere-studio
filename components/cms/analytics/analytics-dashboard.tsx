@@ -15,7 +15,13 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { CheckIcon, PencilIcon, PlusIcon, RotateCcwIcon, XIcon } from "lucide-react"
+import {
+  CheckIcon,
+  PencilIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  XIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 import { v4 as uuid } from "uuid"
 
@@ -44,7 +50,10 @@ import type {
   AnalyticsWidgetId,
   WidgetResultEntry,
 } from "@/lib/analytics/types"
-import { DEFAULT_WIDGET_IDS, ANALYTICS_LAYOUT_VERSION } from "@/lib/analytics/types"
+import {
+  DEFAULT_WIDGET_IDS,
+  ANALYTICS_LAYOUT_VERSION,
+} from "@/lib/analytics/types"
 import { CATALOG_BY_ID } from "@/lib/analytics/widget-catalog"
 
 import {
@@ -62,10 +71,7 @@ import {
 } from "./education-actions"
 import { EducationActionsProvider } from "./education-actions-context"
 import { FilterBadgeRail } from "./filter-badge"
-import {
-  FilterRail,
-  type FilterBuilderRequest,
-} from "./filter-rail"
+import { FilterRail, type FilterBuilderRequest } from "./filter-rail"
 import { LivePulseRail } from "./live-pulse-rail"
 import { useAnalyticsDashboard } from "./use-analytics"
 import { useLayout } from "./use-layout"
@@ -135,7 +141,9 @@ function orderedWidgetIds(
   widgetIds: AnalyticsWidgetId[],
   lgLayout: AnalyticsGridItem[]
 ): AnalyticsWidgetId[] {
-  const sorted = sortByPosition(lgLayout.filter((item) => widgetIds.includes(item.i)))
+  const sorted = sortByPosition(
+    lgLayout.filter((item) => widgetIds.includes(item.i))
+  )
   return sorted.map((item) => item.i)
 }
 
@@ -203,14 +211,22 @@ function focusWidgetInDom(widgetId: AnalyticsWidgetId): boolean {
 
 export function AnalyticsDashboard({
   activeClientId,
+  headingTitle = "Analytics",
+  headingDescription = "Traffic, conversions, and engagement across your site.",
 }: {
   activeClientId: string
+  headingTitle?: string
+  headingDescription?: string
 }) {
   const [filters, setFilters] = useFilterState()
 
   // Layout document (loaded from API). Keyed by active CMS client.
-  const { state: layoutState, isSaving, saveLayout, resetLayout } =
-    useLayout(activeClientId)
+  const {
+    state: layoutState,
+    isSaving,
+    saveLayout,
+    resetLayout,
+  } = useLayout(activeClientId)
 
   const router = useRouter()
 
@@ -271,11 +287,12 @@ export function AnalyticsDashboard({
   }, [])
 
   // The currently-active layout (draft when editing, doc when viewing).
-  const activeLayout = isEditMode && editDraft
-    ? editDraft
-    : layoutState.status === "ready"
-      ? docToDraft(layoutState.layout)
-      : null
+  const activeLayout =
+    isEditMode && editDraft
+      ? editDraft
+      : layoutState.status === "ready"
+        ? docToDraft(layoutState.layout)
+        : null
 
   // Widget IDs for data fetching: use the layout doc, or fall back to defaults.
   const widgetIdsForFetch = useMemo(
@@ -323,8 +340,7 @@ export function AnalyticsDashboard({
 
   // ── Edit mode actions ──
   const handleEnterEdit = useCallback(() => {
-    const doc =
-      layoutState.status === "ready" ? layoutState.layout : null
+    const doc = layoutState.status === "ready" ? layoutState.layout : null
     const draft: EditDraft = doc
       ? docToDraft(doc)
       : {
@@ -358,7 +374,9 @@ export function AnalyticsDashboard({
       setIsEditMode(false)
       setEditDraft(null)
     } else {
-      setSaveError(result.message ?? "Could not save layout. Your changes are still here.")
+      setSaveError(
+        result.message ?? "Could not save layout. Your changes are still here."
+      )
     }
   }, [editDraft, saveLayout])
 
@@ -562,6 +580,8 @@ export function AnalyticsDashboard({
           isEditMode={isEditMode}
           isSaving={isSaving}
           layoutReady={false}
+          headingTitle={headingTitle}
+          headingDescription={headingDescription}
           onEnterEdit={handleEnterEdit}
           onCancelEdit={handleCancelEdit}
           onDoneEdit={handleDoneEdit}
@@ -580,6 +600,8 @@ export function AnalyticsDashboard({
           isEditMode={false}
           isSaving={false}
           layoutReady={false}
+          headingTitle={headingTitle}
+          headingDescription={headingDescription}
           onEnterEdit={handleEnterEdit}
           onCancelEdit={handleCancelEdit}
           onDoneEdit={handleDoneEdit}
@@ -598,6 +620,8 @@ export function AnalyticsDashboard({
           isEditMode={false}
           isSaving={false}
           layoutReady={false}
+          headingTitle={headingTitle}
+          headingDescription={headingDescription}
           onEnterEdit={handleEnterEdit}
           onCancelEdit={handleCancelEdit}
           onDoneEdit={handleDoneEdit}
@@ -616,6 +640,8 @@ export function AnalyticsDashboard({
           isEditMode={isEditMode}
           isSaving={isSaving}
           layoutReady={layoutState.status === "ready"}
+          headingTitle={headingTitle}
+          headingDescription={headingDescription}
           filters={filters}
           onFiltersChange={setFilters}
           loading={false}
@@ -651,6 +677,8 @@ export function AnalyticsDashboard({
           isEditMode={isEditMode}
           isSaving={isSaving}
           layoutReady={layoutState.status === "ready"}
+          headingTitle={headingTitle}
+          headingDescription={headingDescription}
           filters={filters}
           onFiltersChange={setFilters}
           loading={isRefetching}
@@ -758,8 +786,7 @@ function WidgetViewGrid({
 }: WidgetViewGridProps) {
   // Build a map from widget ID to its lg layout item for width lookup.
   const lgMap = useMemo(
-    () =>
-      new Map(lgLayout.map((item) => [item.i, item])),
+    () => new Map(lgLayout.map((item) => [item.i, item])),
     [lgLayout]
   )
 
@@ -768,7 +795,10 @@ function WidgetViewGrid({
   return (
     <>
       {/* Desktop: 12-col CSS grid */}
-      <div className="hidden gap-4 lg:grid" style={{ gridTemplateColumns: "repeat(12, minmax(0, 1fr))" }}>
+      <div
+        className="hidden gap-4 lg:grid"
+        style={{ gridTemplateColumns: "repeat(12, minmax(0, 1fr))" }}
+      >
         {widgetIds.map((id) => {
           const item = lgMap.get(id)
           const colSpan = item?.w ?? 4
@@ -814,6 +844,8 @@ interface DashboardHeaderProps {
   isEditMode: boolean
   isSaving: boolean
   layoutReady: boolean
+  headingTitle: string
+  headingDescription: string
   filters?: AnalyticsGlobalFilters
   onFiltersChange?: (next: AnalyticsGlobalFilters) => void
   loading?: boolean
@@ -835,6 +867,8 @@ function DashboardHeader({
   isEditMode,
   isSaving,
   layoutReady,
+  headingTitle,
+  headingDescription,
   filters,
   onFiltersChange,
   loading,
@@ -854,8 +888,8 @@ function DashboardHeader({
   return (
     <div className="space-y-4">
       <PageHeading
-        title="Analytics"
-        description="Traffic, conversions, and engagement across your site."
+        title={headingTitle}
+        description={headingDescription}
         actions={
           <div className="flex items-center gap-2">
             {/* Keep mounted in edit mode so open_glossary actions still work. */}
@@ -881,7 +915,9 @@ function DashboardHeader({
                 className="h-8 gap-1.5 text-xs text-muted-foreground"
                 onClick={onEnterEdit}
                 disabled={!layoutReady}
-                title={layoutReady ? "Edit dashboard layout" : "Loading layout..."}
+                title={
+                  layoutReady ? "Edit dashboard layout" : "Loading layout..."
+                }
               >
                 <PencilIcon className="size-3" />
                 Edit layout

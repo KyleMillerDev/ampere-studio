@@ -37,6 +37,7 @@ import {
 import { DevInviteUserDialog } from "@/components/cms/dev-invite-user-dialog"
 import { UserMenu } from "@/components/cms/user-menu"
 import type { ClientFeatures } from "@/lib/cms/client-features"
+import { showAnalyticsNav } from "@/lib/cms/client-features"
 import type { ClientOption } from "@/lib/cms/clients"
 
 type NavEntry = {
@@ -133,7 +134,7 @@ function buildWorkspaceNav(
 }
 
 function buildInsightsNav(features: ClientFeatures): NavEntry[] {
-  if (!features.analytics) return []
+  if (!showAnalyticsNav(features)) return []
 
   return [{ title: "Analytics", href: "/analytics", icon: ChartBarLineIcon }]
 }

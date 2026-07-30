@@ -24,8 +24,8 @@ export const CONTENT_TABLE = "Ampere-Studio-Content"
 export const SUBMISSIONS_TABLE = "Ampere-Sites-Form-Submissions"
 export const CLIENTS_TABLE = "Ampere-Clients"
 
-export const IMAGES_BUCKET = "Ampere-Studio-Public"
 export const PUBLIC_BUCKET = "ampere-studio-public"
+export const IMAGES_BUCKET = PUBLIC_BUCKET
 
 export const PUBLISH_BRANCH = "published-ampere-updates"
 

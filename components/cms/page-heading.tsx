@@ -14,21 +14,18 @@ export function PageHeading({
   className,
 }: PageHeadingProps) {
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between",
-        className
-      )}
-    >
-      <div className="space-y-1">
+    <div className={cn("space-y-1", className)}>
+      <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {description ? (
-          <p className="max-w-prose text-sm text-muted-foreground">
-            {description}
-          </p>
+        {actions ? (
+          <div className="flex shrink-0 items-center gap-2">{actions}</div>
         ) : null}
       </div>
-      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+      {description ? (
+        <p className="max-w-prose text-sm text-muted-foreground">
+          {description}
+        </p>
+      ) : null}
     </div>
   )
 }

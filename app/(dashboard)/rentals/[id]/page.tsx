@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation"
 
-import { PageHeading } from "@/components/cms/page-heading"
 import { RentalForm } from "@/components/cms/rental-form"
 import { getRental } from "@/lib/cms/rentals"
 import {
@@ -30,12 +29,12 @@ export default async function EditRentalPage({ params }: Ctx) {
   if (!rental) notFound()
 
   return (
-    <div className="space-y-6">
-      <PageHeading
-        title="Edit rental"
-        description={`${rental.address.street}, ${rental.address.city} — slug is locked after creation.`}
-      />
-      <RentalForm initial={rental} />
-    </div>
+    <RentalForm
+      heading={{
+        title: "Edit rental",
+        description: `${rental.address.street}, ${rental.address.city}`,
+      }}
+      initial={rental}
+    />
   )
 }

@@ -8,19 +8,26 @@
  *   - `loading`: shows skeletons
  *   - `ready`: shows the live dashboard
  *
- * `activeClientId` is passed from the server so "Viewing as" switches
- * (router.refresh) remount/refetch client data for the new client.
+ * Realty accounts (rentals enabled) see analytics on Overview instead.
  */
 import { Suspense } from "react"
+import { redirect } from "next/navigation"
 
 import { AnalyticsDashboard } from "@/components/cms/analytics/analytics-dashboard"
 import { AnalyticsLoadingState } from "@/components/cms/analytics/widget-states"
 import { PageHeading } from "@/components/cms/page-heading"
 import { getActiveClientId } from "@/lib/cms/client-context"
+import { getActiveClientFeatures } from "@/lib/cms/clients"
+import { showAnalyticsInOverview } from "@/lib/cms/client-features"
 
 export const metadata = { title: "Analytics" }
 
 export default async function AnalyticsPage() {
+  const features = await getActiveClientFeatures()
+  if (showAnalyticsInOverview(features)) {
+    redirect("/dashboard")
+  }
+
   const activeClientId = await getActiveClientId()
 
   return (

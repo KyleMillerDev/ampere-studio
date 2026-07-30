@@ -51,3 +51,16 @@ export function parseClientFeatures(record: ClientRecord): ClientFeatures {
     submissions: isTruthyAttribute(record.submissions),
   }
 }
+
+/** Rentals workspaces (realty accounts) use Overview for analytics instead of a separate page. */
+export function isRealtyClient(features: ClientFeatures): boolean {
+  return features.rentals
+}
+
+export function showAnalyticsInOverview(features: ClientFeatures): boolean {
+  return isRealtyClient(features) && features.analytics
+}
+
+export function showAnalyticsNav(features: ClientFeatures): boolean {
+  return features.analytics && !isRealtyClient(features)
+}
