@@ -600,7 +600,9 @@ export function RentalForm({
                       Property type
                     </RentalRequiredLabel>
                     <Select
-                      value={normalizePropertyType(field.value)}
+                      value={normalizePropertyType(
+                        typeof field.value === "string" ? field.value : undefined
+                      )}
                       onValueChange={field.onChange}
                     >
                       <FormControl>
