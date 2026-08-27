@@ -26,7 +26,7 @@ const freshFormValues = (): RentalFormInput =>
     features: [],
     images: [],
     agent: { name: "", phone: "", email: "" },
-  }) as RentalFormInput
+  }) as unknown as RentalFormInput
 
 describe("rental-required-fields", () => {
   it("lists every required rental form path", () => {
