@@ -49,7 +49,9 @@ export function isRentalRequiredFieldSatisfied(
       return typeof values.price === "number" && values.price > 0
     case "propertyType":
       return (PROPERTY_TYPES as readonly string[]).includes(
-        normalizePropertyType(values.propertyType)
+        normalizePropertyType(
+          typeof values.propertyType === "string" ? values.propertyType : undefined
+        )
       )
     case "listedDate":
       return /^\d{4}-\d{2}-\d{2}$/.test(values.listedDate ?? "")
