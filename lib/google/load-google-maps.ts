@@ -79,8 +79,9 @@ export function loadGoogleMaps(apiKey: string): Promise<void> {
     }
 
     const callbackName = `__ampereGoogleMapsInit_${Date.now()}`
-    ;(window as Record<string, unknown>)[callbackName] = () => {
-      delete (window as Record<string, unknown>)[callbackName]
+    const windowWithCallback = window as unknown as Record<string, unknown>
+    windowWithCallback[callbackName] = () => {
+      delete windowWithCallback[callbackName]
       finish()
     }
 
@@ -90,7 +91,7 @@ export function loadGoogleMaps(apiKey: string): Promise<void> {
     script.defer = true
     script.dataset.googleMaps = "true"
     script.onerror = () => {
-      delete (window as Record<string, unknown>)[callbackName]
+      delete windowWithCallback[callbackName]
       reject(new Error("Google Maps failed to load. Check your API key."))
     }
     document.head.appendChild(script)
