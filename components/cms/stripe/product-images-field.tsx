@@ -29,6 +29,8 @@ import { STRIPE_MAX_IMAGES } from "@/lib/validation/stripe-product.schema"
 interface ProductImagesFieldProps {
   images: string[]
   onChange: (images: string[]) => void
+  emptyMessage?: string
+  limitMessage?: string
 }
 
 /**
@@ -39,6 +41,8 @@ interface ProductImagesFieldProps {
 export function ProductImagesField({
   images,
   onChange,
+  emptyMessage = `No images yet. Upload up to ${STRIPE_MAX_IMAGES}; the first one is the primary image.`,
+  limitMessage = `Stripe allows at most ${STRIPE_MAX_IMAGES} images`,
 }: ProductImagesFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -60,7 +64,7 @@ export function ProductImagesField({
   async function handleFileChange(file: File | null) {
     if (!file) return
     if (images.length >= STRIPE_MAX_IMAGES) {
-      toast.error(`Stripe allows at most ${STRIPE_MAX_IMAGES} images`)
+      toast.error(limitMessage)
       return
     }
     setUploading(true)
@@ -101,8 +105,7 @@ export function ProductImagesField({
         </DndContext>
       ) : (
         <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No images yet. Upload up to {STRIPE_MAX_IMAGES}; the first one is the
-          primary image.
+          {emptyMessage}
         </div>
       )}
 

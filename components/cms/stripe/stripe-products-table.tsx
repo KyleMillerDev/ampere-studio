@@ -27,9 +27,9 @@ import { StripeProductRowActions } from "@/components/cms/stripe/product-actions
 import { formatStripeAmount, formatUnixDate } from "@/lib/utils"
 import type { StripeProductView } from "@/lib/validation/stripe-product.schema"
 
-function priceLabel(product: StripeProductView): string {
+function priceLabel(product: StripeProductView, missingPriceLabel: string): string {
   const price = product.defaultPrice
-  if (!price) return "—"
+  if (!price || price.unitAmount === null) return missingPriceLabel
   const amount = formatStripeAmount(price.unitAmount, price.currency)
   if (price.type === "recurring" && price.interval) {
     const every =
@@ -43,9 +43,18 @@ function priceLabel(product: StripeProductView): string {
 
 interface StripeProductsTableProps {
   products: StripeProductView[]
+  /** Shown when a product has no default price. */
+  missingPriceLabel?: string
+  emptyMessage?: string
+  catalogSource?: "stripe" | "ampere"
 }
 
-export function StripeProductsTable({ products }: StripeProductsTableProps) {
+export function StripeProductsTable({
+  products,
+  missingPriceLabel = "—",
+  emptyMessage = "No Stripe products yet. Create your first product to start selling.",
+  catalogSource = "stripe",
+}: StripeProductsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
 
   const columns = useMemo(() => {
@@ -103,7 +112,7 @@ export function StripeProductsTable({ products }: StripeProductsTableProps) {
       col.accessor((row) => row.defaultPrice?.unitAmount ?? -1, {
         id: "price",
         header: "Default price",
-        cell: (info) => priceLabel(info.row.original),
+        cell: (info) => priceLabel(info.row.original, missingPriceLabel),
       }),
       col.accessor((row) => row.images.length, {
         id: "imageCount",
@@ -120,7 +129,7 @@ export function StripeProductsTable({ products }: StripeProductsTableProps) {
         cell: () => null,
       }),
     ]
-  }, [])
+  }, [missingPriceLabel])
 
   const table = useReactTable({
     data: products,
@@ -154,8 +163,7 @@ export function StripeProductsTable({ products }: StripeProductsTableProps) {
                 colSpan={columns.length}
                 className="h-32 text-center text-sm text-muted-foreground"
               >
-                No Stripe products yet. Create your first product to start
-                selling.
+                {emptyMessage}
               </TableCell>
             </TableRow>
           ) : (
@@ -169,6 +177,7 @@ export function StripeProductsTable({ products }: StripeProductsTableProps) {
                     name: product.name,
                     active: product.active,
                   }}
+                  catalogSource={catalogSource}
                 >
                   {(dropdown) => (
                     <TableRow className={entityContextTargetClass}>

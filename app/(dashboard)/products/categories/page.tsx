@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { PlusSignIcon } from "@hugeicons/core-free-icons"
 
@@ -15,6 +16,8 @@ export const dynamic = "force-dynamic"
 
 export default async function CategoriesPage() {
   const catalog = await getActiveCatalogProvider()
+
+  if (catalog === "ampere") redirect("/products")
 
   if (catalog === "square") {
     const enabled = await isSquareEnabled()

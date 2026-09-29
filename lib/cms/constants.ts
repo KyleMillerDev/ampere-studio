@@ -77,5 +77,15 @@ export const SQUARE_SK_PREFIX = {
 
 export type SquareSKPrefixKey = keyof typeof SQUARE_SK_PREFIX
 
+/**
+ * Ampere catalog rows live in Ampere-Studio-Content and are never sent to
+ * Stripe or Square. Product prices are embedded on the product item.
+ * Price ids are stored inside that item, not as their own rows.
+ */
+export const AMPERE_SK_PREFIX = {
+  product: "ampprod_",
+  price: "ampprice_",
+} as const
+
 /** Editor session store is in-memory. Sessions expire to cap server memory. */
 export const EDITOR_SESSION_TTL_MS = 60 * 60 * 1000

@@ -103,8 +103,8 @@ function buildWorkspaceNav(
       icon: PackageIcon,
       matchPrefix: true,
     })
-    // Stripe catalog has no categories UI yet; hide the nav item for now.
-    if (features.catalog !== "stripe") {
+    // Stripe and Ampere catalogs have no categories UI.
+    if (features.catalog !== "stripe" && features.catalog !== "ampere") {
       items.push({
         title: "Categories",
         href: "/products/categories",

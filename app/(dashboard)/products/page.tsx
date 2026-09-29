@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { listCategories } from "@/lib/cms/categories"
 import { getActiveCatalogProvider } from "@/lib/cms/clients"
 import { listProducts } from "@/lib/cms/products"
+import { listAmpereProducts } from "@/lib/ampere/products"
 import { getStripeKeys } from "@/lib/stripe/config"
 import { listStripeProducts } from "@/lib/stripe/products"
 import { isSquareEnabled } from "@/lib/square/config"
@@ -25,6 +26,32 @@ export const dynamic = "force-dynamic"
 export default async function ProductsPage() {
   const catalog = await getActiveCatalogProvider()
   if (!catalog) redirect("/dashboard")
+
+  if (catalog === "ampere") {
+    const products = await listAmpereProducts().catch(() => [])
+    return (
+      <div className="space-y-6">
+        <PageHeading
+          title="Products"
+          description="Products saved in this client's Ampere Studio catalog."
+          actions={
+            <Button asChild>
+              <Link href="/products/new">
+                <HugeiconsIcon icon={PlusSignIcon} className="mr-1 size-4" />
+                New product
+              </Link>
+            </Button>
+          }
+        />
+        <StripeProductsTable
+          products={products}
+          catalogSource="ampere"
+          missingPriceLabel="--"
+          emptyMessage="No products yet. Create your first product to get this catalog started."
+        />
+      </div>
+    )
+  }
 
   if (catalog === "stripe") {
     const stripeKeys = await getStripeKeys()

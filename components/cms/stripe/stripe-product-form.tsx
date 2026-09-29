@@ -41,9 +41,15 @@ import {
   priceViewToDraft,
   type PriceDraft,
 } from "@/components/cms/stripe/price-fields"
-import type {
-  MetadataSuggestions,
-  StripeProductView,
+import {
+  ampereCatalogEndpoints,
+  stripeCatalogEndpoints,
+  type ProductCatalogEndpoints,
+} from "@/lib/cms/product-catalog-endpoints"
+import {
+  STRIPE_MAX_IMAGES,
+  type MetadataSuggestions,
+  type StripeProductView,
 } from "@/lib/validation/stripe-product.schema"
 
 const detailsSchema = z.object({
@@ -58,19 +64,26 @@ interface StripeProductFormProps {
   suggestions: MetadataSuggestions
   initial?: StripeProductView
   submitLabel?: string
+  /** "ampere" saves to DynamoDB and treats price as optional on edit too. */
+  catalogSource?: "stripe" | "ampere"
 }
 
 export function StripeProductForm({
   suggestions,
   initial,
   submitLabel,
+  catalogSource = "stripe",
 }: StripeProductFormProps) {
   const router = useRouter()
+  const endpoints: ProductCatalogEndpoints =
+    catalogSource === "ampere" ? ampereCatalogEndpoints : stripeCatalogEndpoints
   const [images, setImages] = useState<string[]>(initial?.images ?? [])
   const [metadataRows, setMetadataRows] = useState<MetadataRow[]>(() =>
     buildMetadataRows(suggestions, initial?.metadata)
   )
-  const [withPrice, setWithPrice] = useState(false)
+  const [withPrice, setWithPrice] = useState(
+    () => catalogSource === "ampere" && Boolean(initial?.defaultPrice)
+  )
   const [priceDraft, setPriceDraft] = useState<PriceDraft>(emptyPriceDraft)
   const [editPriceDraft, setEditPriceDraft] = useState<PriceDraft>(() =>
     priceViewToDraft(initial?.defaultPrice ?? null)
@@ -121,7 +134,7 @@ export function StripeProductForm({
       return false
     }
 
-    const createRes = await fetch(`/api/stripe/products/${productId}/prices`, {
+    const createRes = await fetch(endpoints.prices(productId), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(result.input),
@@ -135,7 +148,7 @@ export function StripeProductForm({
       price: { id: string }
     }
 
-    const defaultRes = await fetch(`/api/stripe/products/${productId}`, {
+    const defaultRes = await fetch(endpoints.product(productId), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ defaultPriceId: newPrice.id }),
@@ -147,7 +160,7 @@ export function StripeProductForm({
     }
 
     if (oldDefault?.active) {
-      await fetch(`/api/stripe/prices/${oldDefault.id}`, {
+      await fetch(endpoints.price(oldDefault.id), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: false }),
@@ -163,6 +176,10 @@ export function StripeProductForm({
 
     let defaultPrice
     if (!initial && withPrice) {
+      if (catalogSource === "ampere" && !priceDraft.amount.trim()) {
+        toast.error("Enter a price or turn the price off")
+        return
+      }
       const result = priceDraftToInput(priceDraft)
       if ("error" in result) {
         toast.error(result.error)
@@ -171,13 +188,33 @@ export function StripeProductForm({
       defaultPrice = result.input
     }
 
-    const url = initial
-      ? `/api/stripe/products/${initial.id}`
-      : "/api/stripe/products"
+    if (
+      initial &&
+      catalogSource === "ampere" &&
+      withPrice &&
+      !editPriceDraft.amount.trim()
+    ) {
+      toast.error("Enter an amount or turn the price off")
+      return
+    }
+
+    const url = initial ? endpoints.product(initial.id) : endpoints.collection
     const method = initial ? "PATCH" : "POST"
     const payload = initial
-      ? { ...values, images, metadata }
-      : { ...values, images, metadata, defaultPrice }
+      ? {
+          ...values,
+          images,
+          metadata,
+          ...(catalogSource === "ampere" && !withPrice
+            ? { defaultPriceId: null }
+            : {}),
+        }
+      : {
+          ...values,
+          images,
+          metadata,
+          ...(defaultPrice ? { defaultPrice } : {}),
+        }
 
     const res = await fetch(url, {
       method,
@@ -191,7 +228,7 @@ export function StripeProductForm({
     }
     const data = (await res.json()) as { product: StripeProductView }
 
-    if (initial) {
+    if (initial && !(catalogSource === "ampere" && !withPrice)) {
       const priceOk = await applyPriceChange(data.product.id)
       if (!priceOk) return
     }
@@ -204,11 +241,13 @@ export function StripeProductForm({
   async function onArchive() {
     if (!initial) return
     const ok = window.confirm(
-      `Archive "${initial.name}"? It stays in Stripe but is hidden from new purchases.`
+      catalogSource === "ampere"
+        ? `Archive "${initial.name}"? It stays in your catalog but is hidden from new use.`
+        : `Archive "${initial.name}"? It stays in Stripe but is hidden from new purchases.`
     )
     if (!ok) return
     setIsArchiving(true)
-    const res = await fetch(`/api/stripe/products/${initial.id}`, {
+    const res = await fetch(endpoints.product(initial.id), {
       method: "DELETE",
     })
     setIsArchiving(false)
@@ -230,8 +269,9 @@ export function StripeProductForm({
               <CardHeader>
                 <CardTitle>Product details</CardTitle>
                 <CardDescription>
-                  The name and description shown on Stripe checkout pages and
-                  invoices.
+                  {catalogSource === "ampere"
+                    ? "The name and description saved with this product."
+                    : "The name and description shown on Stripe checkout pages and invoices."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -280,7 +320,20 @@ export function StripeProductForm({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ProductImagesField images={images} onChange={setImages} />
+                <ProductImagesField
+                  images={images}
+                  onChange={setImages}
+                  emptyMessage={
+                    catalogSource === "ampere"
+                      ? `No images yet. Upload up to ${STRIPE_MAX_IMAGES}. The first one is the primary image.`
+                      : undefined
+                  }
+                  limitMessage={
+                    catalogSource === "ampere"
+                      ? `You can add at most ${STRIPE_MAX_IMAGES} images`
+                      : undefined
+                  }
+                />
               </CardContent>
             </Card>
 
@@ -307,7 +360,9 @@ export function StripeProductForm({
               <CardHeader>
                 <CardTitle>Status</CardTitle>
                 <CardDescription>
-                  Inactive products are hidden from new purchases.
+                  {catalogSource === "ampere"
+                    ? "Inactive products stay in your catalog and are hidden from new use."
+                    : "Inactive products are hidden from new purchases."}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -329,7 +384,40 @@ export function StripeProductForm({
               </CardContent>
             </Card>
 
-            {initial ? (
+            {catalogSource === "ampere" || !initial ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{initial ? "Price" : "Initial price"}</CardTitle>
+                  <CardDescription>
+                    {catalogSource === "ampere"
+                      ? initial
+                        ? "Price is optional. Turn this off to save the product without a price. Changing the amount adds a new price and archives the previous default."
+                        : "Price is optional. Turn this on to set a default price now. You can add more prices later."
+                      : "Optionally create a default price with this product. You can add more prices afterwards."}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {catalogSource === "ampere"
+                        ? "Include a default price"
+                        : "Add a default price"}
+                    </span>
+                    <Switch
+                      checked={withPrice}
+                      onCheckedChange={setWithPrice}
+                    />
+                  </div>
+                  {withPrice ? (
+                    <PriceFields
+                      draft={initial ? editPriceDraft : priceDraft}
+                      onChange={initial ? setEditPriceDraft : setPriceDraft}
+                      idPrefix={initial ? "edit-price" : "initial-price"}
+                    />
+                  ) : null}
+                </CardContent>
+              </Card>
+            ) : (
               <Card>
                 <CardHeader>
                   <CardTitle>Price</CardTitle>
@@ -345,34 +433,6 @@ export function StripeProductForm({
                     onChange={setEditPriceDraft}
                     idPrefix="edit-price"
                   />
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Initial price</CardTitle>
-                  <CardDescription>
-                    Optionally create a default price with this product. You can
-                    add more prices afterwards.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                      Add a default price
-                    </span>
-                    <Switch
-                      checked={withPrice}
-                      onCheckedChange={setWithPrice}
-                    />
-                  </div>
-                  {withPrice ? (
-                    <PriceFields
-                      draft={priceDraft}
-                      onChange={setPriceDraft}
-                      idPrefix="initial-price"
-                    />
-                  ) : null}
                 </CardContent>
               </Card>
             )}

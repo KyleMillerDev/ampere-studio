@@ -4,6 +4,10 @@ import { PageHeading } from "@/components/cms/page-heading"
 import { StripeProductForm } from "@/components/cms/stripe/stripe-product-form"
 import { SquareProductForm } from "@/components/cms/square/square-product-form"
 import { getActiveCatalogProvider } from "@/lib/cms/clients"
+import {
+  getAmpereMetadataSuggestions,
+  getAmpereProduct,
+} from "@/lib/ampere/products"
 import { getStripeKeys } from "@/lib/stripe/config"
 import { getMetadataSuggestions, getStripeProduct } from "@/lib/stripe/products"
 import { isSquareEnabled } from "@/lib/square/config"
@@ -20,6 +24,28 @@ type Props = { params: Promise<{ id: string }> }
 export default async function EditProductPage({ params }: Props) {
   const { id } = await params
   const catalog = await getActiveCatalogProvider()
+
+  if (catalog === "ampere") {
+    const [product, suggestions] = await Promise.all([
+      getAmpereProduct(id),
+      getAmpereMetadataSuggestions().catch(() => ({})),
+    ])
+    if (!product) notFound()
+    return (
+      <div className="space-y-6">
+        <PageHeading
+          title={product.name || "Edit product"}
+          description="Changes save in this client's Ampere Studio catalog."
+        />
+        <StripeProductForm
+          key={product.id}
+          catalogSource="ampere"
+          suggestions={suggestions}
+          initial={product}
+        />
+      </div>
+    )
+  }
 
   if (catalog === "stripe") {
     const stripeKeys = await getStripeKeys()

@@ -6,6 +6,7 @@ import { StripeProductForm } from "@/components/cms/stripe/stripe-product-form"
 import { SquareProductForm } from "@/components/cms/square/square-product-form"
 import { listCategories } from "@/lib/cms/categories"
 import { getActiveCatalogProvider } from "@/lib/cms/clients"
+import { getAmpereMetadataSuggestions } from "@/lib/ampere/products"
 import { getStripeKeys } from "@/lib/stripe/config"
 import { getMetadataSuggestions } from "@/lib/stripe/products"
 import { isSquareEnabled } from "@/lib/square/config"
@@ -19,6 +20,23 @@ export const dynamic = "force-dynamic"
 export default async function NewProductPage() {
   const catalog = await getActiveCatalogProvider()
   if (!catalog) redirect("/dashboard")
+
+  if (catalog === "ampere") {
+    const suggestions = await getAmpereMetadataSuggestions().catch(() => ({}))
+    return (
+      <div className="space-y-6">
+        <PageHeading
+          title="New product"
+          description="Create a product in this client's Ampere Studio catalog. A price is optional."
+        />
+        <StripeProductForm
+          catalogSource="ampere"
+          suggestions={suggestions}
+          submitLabel="Create product"
+        />
+      </div>
+    )
+  }
 
   if (catalog === "stripe") {
     const stripeKeys = await getStripeKeys()

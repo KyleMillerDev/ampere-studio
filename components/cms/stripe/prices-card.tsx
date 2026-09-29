@@ -4,10 +4,14 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { PlusSignIcon, MoreHorizontalIcon } from "@hugeicons/core-free-icons"
+import { PlusSignIcon } from "@hugeicons/core-free-icons"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  EntityRowActions,
+  entityContextTargetClass,
+} from "@/components/cms/entity-row-actions"
 import {
   Card,
   CardContent,
@@ -24,12 +28,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Table,
   TableBody,
   TableCell,
@@ -43,6 +41,10 @@ import {
   priceDraftToInput,
   type PriceDraft,
 } from "@/components/cms/stripe/price-fields"
+import {
+  ampereCatalogEndpoints,
+  stripeCatalogEndpoints,
+} from "@/lib/cms/product-catalog-endpoints"
 import { formatStripeAmount } from "@/lib/utils"
 import type { StripePriceView } from "@/lib/validation/stripe-product.schema"
 
@@ -58,9 +60,20 @@ function recurrenceLabel(price: StripePriceView): string {
 interface PricesCardProps {
   productId: string
   prices: StripePriceView[]
+  catalogSource?: "stripe" | "ampere"
+  description?: string
+  emptyMessage?: string
 }
 
-export function PricesCard({ productId, prices }: PricesCardProps) {
+export function PricesCard({
+  productId,
+  prices,
+  catalogSource = "stripe",
+  description = "All prices attached to this product in Stripe.",
+  emptyMessage = "No prices yet. Add one so this product can be sold.",
+}: PricesCardProps) {
+  const endpoints =
+    catalogSource === "ampere" ? ampereCatalogEndpoints : stripeCatalogEndpoints
   const router = useRouter()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [draft, setDraft] = useState<PriceDraft>(emptyPriceDraft)
@@ -73,7 +86,7 @@ export function PricesCard({ productId, prices }: PricesCardProps) {
       return
     }
     setSaving(true)
-    const res = await fetch(`/api/stripe/products/${productId}/prices`, {
+    const res = await fetch(endpoints.prices(productId), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(result.input),
@@ -91,7 +104,7 @@ export function PricesCard({ productId, prices }: PricesCardProps) {
   }
 
   async function setDefault(priceId: string) {
-    const res = await fetch(`/api/stripe/products/${productId}`, {
+    const res = await fetch(endpoints.product(productId), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ defaultPriceId: priceId }),
@@ -106,7 +119,7 @@ export function PricesCard({ productId, prices }: PricesCardProps) {
   }
 
   async function setActive(priceId: string, active: boolean) {
-    const res = await fetch(`/api/stripe/prices/${priceId}`, {
+    const res = await fetch(endpoints.price(priceId), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active }),
@@ -125,9 +138,7 @@ export function PricesCard({ productId, prices }: PricesCardProps) {
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div className="space-y-1.5">
           <CardTitle>Prices</CardTitle>
-          <CardDescription>
-            All prices attached to this product in Stripe.
-          </CardDescription>
+          <CardDescription>{description}</CardDescription>
         </div>
         <Button size="sm" onClick={() => setDialogOpen(true)}>
           <HugeiconsIcon icon={PlusSignIcon} className="mr-1 size-4" />
@@ -137,7 +148,7 @@ export function PricesCard({ productId, prices }: PricesCardProps) {
       <CardContent>
         {prices.length === 0 ? (
           <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-            No prices yet. Add one so this product can be sold.
+            {emptyMessage}
           </div>
         ) : (
           <Table>
@@ -152,66 +163,56 @@ export function PricesCard({ productId, prices }: PricesCardProps) {
             </TableHeader>
             <TableBody>
               {prices.map((price) => (
-                <TableRow key={price.id}>
-                  <TableCell className="font-medium">
-                    {formatStripeAmount(price.unitAmount, price.currency)}
-                    {price.isDefault ? (
-                      <Badge variant="secondary" className="ml-2">
-                        Default
-                      </Badge>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>{recurrenceLabel(price)}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {price.nickname || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={price.active ? "default" : "outline"}>
-                      {price.active ? "active" : "archived"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Price actions"
-                          >
-                            <HugeiconsIcon
-                              icon={MoreHorizontalIcon}
-                              className="size-4"
-                            />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {price.active && !price.isDefault ? (
-                            <DropdownMenuItem
-                              onClick={() => setDefault(price.id)}
-                            >
-                              Set as default
-                            </DropdownMenuItem>
-                          ) : null}
-                          {price.active ? (
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setActive(price.id, false)}
-                            >
-                              Archive
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem
-                              onClick={() => setActive(price.id, true)}
-                            >
-                              Reactivate
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                <EntityRowActions
+                  key={price.id}
+                  dropdownAriaLabel="Price actions"
+                  renderItems={({ Item }) => (
+                    <>
+                      {price.active && !price.isDefault ? (
+                        <Item onSelect={() => setDefault(price.id)}>
+                          Set as default
+                        </Item>
+                      ) : null}
+                      {price.active ? (
+                        <Item
+                          className="text-destructive focus:text-destructive"
+                          onSelect={() => setActive(price.id, false)}
+                        >
+                          Archive
+                        </Item>
+                      ) : (
+                        <Item onSelect={() => setActive(price.id, true)}>
+                          Reactivate
+                        </Item>
+                      )}
+                    </>
+                  )}
+                >
+                  {(dropdown) => (
+                    <TableRow className={entityContextTargetClass}>
+                      <TableCell className="font-medium">
+                        {formatStripeAmount(price.unitAmount, price.currency)}
+                        {price.isDefault ? (
+                          <Badge variant="secondary" className="ml-2">
+                            Default
+                          </Badge>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>{recurrenceLabel(price)}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {price.nickname || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={price.active ? "default" : "outline"}>
+                          {price.active ? "active" : "archived"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end">{dropdown}</div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </EntityRowActions>
               ))}
             </TableBody>
           </Table>

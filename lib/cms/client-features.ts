@@ -1,6 +1,6 @@
 import type { ClientRecord } from "@/lib/cms/clients"
 
-export type CatalogProvider = "stripe" | "square" | "custom"
+export type CatalogProvider = "stripe" | "square" | "ampere" | "custom"
 
 export interface ClientFeatures {
   catalog: CatalogProvider | null
@@ -28,6 +28,7 @@ export function isTruthyAttribute(value: unknown): boolean {
 
 /**
  * Resolves the catalog provider from a client's `catalog` attribute.
+ * "ampere" is the in-house catalog (DynamoDB only, no POS).
  * Truthy values without a known provider default to the custom CMS catalog.
  */
 export function parseCatalogProvider(value: unknown): CatalogProvider | null {
@@ -36,6 +37,7 @@ export function parseCatalogProvider(value: unknown): CatalogProvider | null {
     const normalized = value.trim().toLowerCase()
     if (normalized === "stripe") return "stripe"
     if (normalized === "square") return "square"
+    if (normalized === "ampere") return "ampere"
     if (normalized === "custom") return "custom"
   }
   return "custom"
